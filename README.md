@@ -8,7 +8,7 @@ What makes Minidumper interesting is the **heap** mode. For large applications, 
 
 Also included is a stand-alone library (DumpWriter) that can be added to any project to capture dumps of arbitrary processes. The DumpWriter project also contains the full interop signatures for the Win32 `MiniDumpWriteDump` API and all associated data structures, including callback input and output structures.
 
-> ### NOTES
+> #### NOTES
 > * To create dumps of 32-bit processes, make sure to use the 32-bit version of the application -- and vice versa for 64-bit.
 > * .NET 4.6 is currently not supported because of a limitation in CLRMD. You can work around this in the meantime by compiling your own version of CLRMD from [this pull request](https://github.com/Microsoft/dotnetsamples/pull/23/files).
 
