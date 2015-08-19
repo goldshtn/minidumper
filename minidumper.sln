@@ -3,14 +3,16 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DumpWriter", "DumpWriter.csproj", "{1C19B4D7-E6A6-4A9A-8495-8231FA167D1C}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A82A1C60-8298-42E3-9AFE-C0B37391952C}"
 	ProjectSection(SolutionItems) = preProject
 		.nuget\NuGet.Config = .nuget\NuGet.Config
 		.nuget\NuGet.exe = .nuget\NuGet.exe
 		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniDumper", "MiniDumper\MiniDumper.csproj", "{8824AA9B-8D64-4C3A-BD50-1742FDA827A5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DumpWriter", "DumpWriter\DumpWriter.csproj", "{1C19B4D7-E6A6-4A9A-8495-8231FA167D1C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,6 +22,14 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8824AA9B-8D64-4C3A-BD50-1742FDA827A5}.Debug|x64.ActiveCfg = Debug|x64
+		{8824AA9B-8D64-4C3A-BD50-1742FDA827A5}.Debug|x64.Build.0 = Debug|x64
+		{8824AA9B-8D64-4C3A-BD50-1742FDA827A5}.Debug|x86.ActiveCfg = Debug|x86
+		{8824AA9B-8D64-4C3A-BD50-1742FDA827A5}.Debug|x86.Build.0 = Debug|x86
+		{8824AA9B-8D64-4C3A-BD50-1742FDA827A5}.Release|x64.ActiveCfg = Release|x64
+		{8824AA9B-8D64-4C3A-BD50-1742FDA827A5}.Release|x64.Build.0 = Release|x64
+		{8824AA9B-8D64-4C3A-BD50-1742FDA827A5}.Release|x86.ActiveCfg = Release|x86
+		{8824AA9B-8D64-4C3A-BD50-1742FDA827A5}.Release|x86.Build.0 = Release|x86
 		{1C19B4D7-E6A6-4A9A-8495-8231FA167D1C}.Debug|x64.ActiveCfg = Debug|x64
 		{1C19B4D7-E6A6-4A9A-8495-8231FA167D1C}.Debug|x64.Build.0 = Debug|x64
 		{1C19B4D7-E6A6-4A9A-8495-8231FA167D1C}.Debug|x86.ActiveCfg = Debug|x86
