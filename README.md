@@ -11,6 +11,7 @@ Also included is a stand-alone library (DumpWriter) that can be added to any pro
 > #### NOTES
 > * To create dumps of 32-bit processes, make sure to use the 32-bit version of the application -- and vice versa for 64-bit.
 > * .NET 4.6 is currently not supported because of a limitation in CLRMD. You can work around this in the meantime by compiling your own version of CLRMD from [this pull request](https://github.com/Microsoft/dotnetsamples/pull/23/files).
+> * MiniDumper has gone through very minimal testing. Although it is unlikely that it will cause any damage to the target process (if dump generation fails, MiniDumper exits and the target continues running), but YMMV.
 
 ### Usage
 
