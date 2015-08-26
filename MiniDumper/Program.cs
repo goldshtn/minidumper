@@ -18,7 +18,12 @@ namespace MiniDumper
             var pid = GetTargetProcessId(options);
             Console.WriteLine("Dumping process id {0}...", pid);
             var dumper = new DumpWriter.DumpWriter(options.Verbose ? Console.Out : null);
-            dumper.Dump(pid, OptionToDumpType(options), options.DumpFileName);
+            dumper.Dump(
+                pid,
+                OptionToDumpType(options),
+                options.DumpFileName,
+                writeAsync: options.Async
+                );
             Console.WriteLine("Dump generated successfully, file size {0:N0} bytes",
                 new FileInfo(options.DumpFileName).Length);
         }

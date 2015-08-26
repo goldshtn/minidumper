@@ -252,7 +252,7 @@ namespace DumpWriter
         public IntPtr Handle;
         public ulong Offset;
         public IntPtr Buffer;
-        public ulong BufferBytes;
+        public uint BufferBytes;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]

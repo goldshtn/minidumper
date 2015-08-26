@@ -30,6 +30,11 @@ namespace MiniDumper
             "Create a complete dump file with the full memory address space.")]
         public bool FullDump { get; set; }
 
+        [Option("async", HelpText =
+            "Write dump chunks to disk asynchronously. Reduces process suspension time " +
+            "at the expense of higher memory usage.")]
+        public bool Async { get; set; }
+
         [Option('v', HelpText = "Get detailed diagnostic output from the dump capturing process.")]
         public bool Verbose { get; set; }
     }

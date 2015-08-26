@@ -1,5 +1,6 @@
 ﻿using Microsoft.Diagnostics.Runtime;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -20,12 +21,23 @@ namespace DumpWriter
 
     public class DumpWriter
     {
+        struct DumpedSegment
+        {
+            public ulong Offset;
+            public byte[] Data;
+        }
+
         private TextWriter _logger;
         private C5.TreeDictionary<ulong, ulong> _majorClrRegions = new C5.TreeDictionary<ulong, ulong>();
         private C5.TreeDictionary<ulong, ulong> _otherClrRegions = new C5.TreeDictionary<ulong, ulong>();
         private int _pid;
         private DumpType _dumpType;
         private IEnumerator<C5.KeyValuePair<ulong, ulong>> _regionEnumerator = null;
+        private BlockingCollection<DumpedSegment> _dumpedSegments = new BlockingCollection<DumpedSegment>();
+        private FileStream _dumpFileStream;
+        private Task _segmentSpillingTask;
+        private bool _spillSegmentsAsynchronously;
+        private bool _needMemoryCallbacks;
 
         private IEnumerable<C5.KeyValuePair<ulong, ulong>> EnumerateAllNeededRegions()
         {
@@ -166,13 +178,39 @@ namespace DumpWriter
             {
                 // I/O callbacks
                 case MINIDUMP_CALLBACK_TYPE.IoWriteAllCallback:
-                case MINIDUMP_CALLBACK_TYPE.IoFinishCallback:
-                case MINIDUMP_CALLBACK_TYPE.IoStartCallback:
-                    _logger.WriteLine("\tIO: handle = {0}", CallbackInput.Io.Handle);
+                    _logger.WriteLine("\tIOWriteAll: offset = {0:x8} buffer = {1:x16} size = {2:x8}",
+                        CallbackInput.Io.Offset, CallbackInput.Io.Buffer, CallbackInput.Io.BufferBytes);
+                    var segment = new DumpedSegment
+                    {
+                        Offset = CallbackInput.Io.Offset,
+                        Data = new byte[CallbackInput.Io.BufferBytes]
+                    };
+                    Marshal.Copy(CallbackInput.Io.Buffer, segment.Data, 0, segment.Data.Length);
+                    _dumpedSegments.Add(segment);
                     CallbackOutput.Status = 0;
-                    DetermineNeededRegions();
-                    // Providing S_FALSE (1) as the status here instructs dbghelp to send all
-                    // I/O through the callback (IoWriteAllCallback).
+                    break;
+                case MINIDUMP_CALLBACK_TYPE.IoFinishCallback:
+                    _logger.WriteLine("\tIOFinish");
+                    _dumpedSegments.CompleteAdding();
+                    CallbackOutput.Status = 0;
+                    break;
+                case MINIDUMP_CALLBACK_TYPE.IoStartCallback:
+                    _logger.WriteLine("\tIOStart: handle = {0}", CallbackInput.Io.Handle);
+                    if (_spillSegmentsAsynchronously)
+                    {
+                        // Providing S_FALSE (1) as the status here instructs dbghelp to send all
+                        // I/O through the callback (IoWriteAllCallback).
+                        CallbackOutput.Status = 1;
+                        _segmentSpillingTask = Task.Factory.StartNew(SpillDumpSegmentsToDisk, TaskCreationOptions.LongRunning);
+                    }
+                    else
+                    {
+                        CallbackOutput.Status = 0;
+                    }
+                    if (_needMemoryCallbacks)
+                    {
+                        DetermineNeededRegions();
+                    }
                     break;
 
                 // Cancel callback
@@ -212,6 +250,8 @@ namespace DumpWriter
 
                 // Memory callbacks
                 case MINIDUMP_CALLBACK_TYPE.MemoryCallback:
+                    if (!_needMemoryCallbacks)
+                        break;
                     if (_regionEnumerator == null)
                     {
                         _regionEnumerator = EnumerateAllNeededRegions().GetEnumerator();
@@ -230,6 +270,8 @@ namespace DumpWriter
                     // not capturing a full memory dump.
                     break;
                 case MINIDUMP_CALLBACK_TYPE.IncludeVmRegionCallback:
+                    if (!_needMemoryCallbacks)
+                        break;
                     FilterVMRegion(ref CallbackOutput);
                     break;
 
@@ -291,10 +333,11 @@ namespace DumpWriter
             _logger = logger ?? TextWriter.Null;
         }
 
-        public void Dump(int pid, DumpType dumpType, string fileName, string dumpComment = null)
+        public void Dump(int pid, DumpType dumpType, string fileName, bool writeAsync = false, string dumpComment = null)
         {
             _pid = pid;
             _dumpType = dumpType;
+            _spillSegmentsAsynchronously = writeAsync;
             dumpComment = dumpComment ?? ("DumpWriter: " + _dumpType.ToString());
 
             IntPtr hProcess = DumpNativeMethods.OpenProcess(
@@ -305,13 +348,16 @@ namespace DumpWriter
             if (hProcess == IntPtr.Zero)
                 throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", _pid, Marshal.GetLastWin32Error()));
 
-            FileStream dumpFileStream = new FileStream(fileName, FileMode.Create);
+            _dumpFileStream = new FileStream(fileName, FileMode.Create);
 
             var exceptionParam = new MINIDUMP_EXCEPTION_INFORMATION();
             var userStreamParam = PrepareUserStream(dumpComment);
             var callbackParam = new MINIDUMP_CALLBACK_INFORMATION();
-            if (_dumpType == DumpType.FullMemoryExcludingSafeRegions ||
-                _dumpType == DumpType.MinimalWithFullCLRHeap)
+            _needMemoryCallbacks = (
+                _dumpType == DumpType.FullMemoryExcludingSafeRegions ||
+                _dumpType == DumpType.MinimalWithFullCLRHeap
+                );
+            if (_needMemoryCallbacks || _spillSegmentsAsynchronously)
             {
                 callbackParam.CallbackRoutine = CallbackRoutine;
             }
@@ -320,10 +366,11 @@ namespace DumpWriter
                 (_dumpType == DumpType.FullMemory || _dumpType == DumpType.FullMemoryExcludingSafeRegions) ?
                 MINIDUMP_TYPE.MiniDumpWithFullMemory | MINIDUMP_TYPE.MiniDumpWithHandleData | MINIDUMP_TYPE.MiniDumpWithFullMemoryInfo :
                 MINIDUMP_TYPE.MiniDumpWithHandleData | MINIDUMP_TYPE.MiniDumpWithFullMemoryInfo;
+            Stopwatch sw = Stopwatch.StartNew();
             bool success = DumpNativeMethods.MiniDumpWriteDump(
                 hProcess,
                 (uint)_pid,
-                dumpFileStream.SafeFileHandle.DangerousGetHandle(),
+                _dumpFileStream.SafeFileHandle.DangerousGetHandle(),
                 nativeDumpType,
                 ref exceptionParam,
                 ref userStreamParam,
@@ -332,9 +379,30 @@ namespace DumpWriter
             if (!success)
                 throw new ApplicationException(String.Format("Error writing dump, error {0:x8}", Marshal.GetLastWin32Error()));
 
+            _logger.WriteLine("Process was suspended for {0:N2}ms", sw.Elapsed.TotalMilliseconds);
+
+            if (_spillSegmentsAsynchronously)
+            {
+                // We are asynchronously spilling dump segments to disk, need to wait
+                // for this process to complete before returning to the caller.
+                _segmentSpillingTask.Wait();
+                _logger.WriteLine(
+                    "Total dump writing time including async flush was {0:N2}ms",
+                    sw.Elapsed.TotalMilliseconds);
+            }
+
             userStreamParam.Delete();
             DumpNativeMethods.CloseHandle(hProcess);
-            dumpFileStream.Close();
+            _dumpFileStream.Close();
+        }
+
+        private void SpillDumpSegmentsToDisk()
+        {
+            foreach (var segment in _dumpedSegments.GetConsumingEnumerable())
+            {
+                _dumpFileStream.Seek((long)segment.Offset, SeekOrigin.Begin);
+                _dumpFileStream.Write(segment.Data, 0, segment.Data.Length);
+            }
         }
 
         private static MINIDUMP_USER_STREAM_INFORMATION PrepareUserStream(string dumpComment)
