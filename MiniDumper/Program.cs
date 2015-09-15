@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DumpWriter;
 using System.Diagnostics;
 using System.IO;
+using NDesk.Options;
 
 namespace MiniDumper
 {
@@ -87,13 +88,26 @@ namespace MiniDumper
 
         static void Main(string[] args)
         {
-            try
-            {
+            //var dumpType = DumpType.MinimalWithFullCLRHeap;
+            //bool dumpOnFirstChanceException = false, dumpOnSecondChanceException = false, 
+            //    treatBreakpointAsException = false, cloneProcess = false, installAsSystemDebugger = false, 
+            //    showsDebugLogs = false, overwriteExistingDumpFile = false, dumpOnTermination = false, 
+            //    waitForProcess = false, showHelp = false;
+            //String exceptionFilter = null;
+
+
+            //var p = new OptionSet {
+            //    { "b", "Treat debug breakpoints as exceptions (otherwise ignore them).", v => treatBreakpointAsException = v != null },
+            //    { "e=", "Treat debug breakpoints as exceptions (otherwise ignore them).", v => treatBreakpointAsException = v != null },
+            //    { "log=", "a path to the folder where transaction log backups are stored", v => logPath = v },
+            //    { "h|help", "show help usage", v => showHelp = v != null },
+            //    { "m|mirror", "if the database is mirrored we will restore the mirroring session", v => checkMirror = v != null },
+            //};
+
+            try {
                 var result = Parser.Default.ParseArguments<CommandLineOptions>(args);
                 result.WithParsed(TakeDump);
-            }
-            catch (Exception ex)
-            {
+            } catch (Exception ex) {
                 Console.Error.WriteLine("ERROR: {0}", ex.Message);
             }
         }
