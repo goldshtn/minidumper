@@ -384,6 +384,7 @@ namespace Microsoft.Diagnostics.Runtime.Interop
         DEFAULT = 0,
         DETACH_ON_EXIT = 1,
         ONLY_THIS_PROCESS = 2,
+        CREATE_SUSPENDED = 4
     }
 
     public enum DEBUG_DUMP : uint

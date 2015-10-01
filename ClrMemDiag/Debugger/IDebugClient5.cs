@@ -165,13 +165,13 @@ namespace Microsoft.Diagnostics.Runtime.Interop
 
         [PreserveSig]
         new int GetOutputCallbacks(
-            [Out] out IntPtr Callbacks);
+            [Out] out IDebugOutputCallbacks Callbacks);
 
         /* We may have to pass a debugger engine conversion thunk back in so we can't specify a specific interface */
 
         [PreserveSig]
         new int SetOutputCallbacks(
-            [In] IntPtr Callbacks);
+            [In] IDebugOutputCallbacks Callbacks);
 
         [PreserveSig]
         new int GetOutputMask(
@@ -231,7 +231,7 @@ namespace Microsoft.Diagnostics.Runtime.Interop
 
         [PreserveSig]
         new int SetEventCallbacks(
-            [In] IntPtr Callbacks);
+            [In] IDebugEventCallbacks Callbacks);
 
         [PreserveSig]
         new int FlushCallbacks();
@@ -430,7 +430,7 @@ namespace Microsoft.Diagnostics.Runtime.Interop
 
         [PreserveSig]
         int SetEventCallbacksWide(
-            [In] IntPtr Callbacks);
+            [In] IDebugEventCallbacksWide Callbacks);
 
         [PreserveSig]
         int CreateProcess2(

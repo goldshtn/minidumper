@@ -9,18 +9,6 @@ namespace MiniDumper
 {
     class CommandLineOptions
     {
-        // FIXME to remove
-        [Option("pid", HelpText = "The id of the process to dump.")]
-        public int ProcessId { get; set; }
-
-        // FIXME to remove
-        [Option("pn", HelpText = "The name of the process to dump.")]
-        public string ProcessName { get; set; }
-
-        // FIXME to remove
-        [Option('z', Required = true, HelpText = "The name of the dump file to create.")]
-        public string DumpFileName { get; set; }
-
         [Option("mm", HelpText =
             "Create a minimal dump file, enough to diagnose crashes and display call stacks.")]
         public bool MinimalDump { get; set; }
@@ -47,7 +35,7 @@ namespace MiniDumper
 
         [Option('e', Default = 2, HelpText ="Write a dump when the process encounters an unhandled exception. " +
             "Include the 1 to create dump on first chance exceptions.")]
-        public byte DumpOnException { get; set; }
+        public int DumpOnException { get; set; }
 
         [Option('b', HelpText = "Treat debug breakpoints as exceptions (otherwise ignore them).")]
         public bool TreatBreakpointAsException { get; set; }
@@ -61,7 +49,7 @@ namespace MiniDumper
         [Option('x', HelpText = "Launch the specified image with optional arguments.")]
         public String DumpFolderForNewlyStartedProcess { get; set; }
 
-        [Option('n', HelpText = "Number of dumps to write before exiting.")]
+        [Option('n', HelpText = "Number of dumps to write before exiting.", Default = 1)]
         public int NumberOfDumps { get; set; }
 
         [Option('o', HelpText = "Overwrite an existing dump file.")]
@@ -76,7 +64,7 @@ namespace MiniDumper
         [Value(0, Required = true)]
         public String ProcessInfo { get; set; }
 
-        [Value(1, Required = false)]
-        public String[] Arguments { get; set; }
+        [Value(0, Required = false)]
+        public IList<String> Args { get; set; }
     }
 }

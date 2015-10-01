@@ -13,10 +13,11 @@ namespace Microsoft.Diagnostics.Runtime
 {
     public unsafe class DbgEngDataReader : IDisposable, IDataReader
     {
+        const uint msecTimeout = 2000;
         static int s_totalInstanceCount = 0;
         static bool s_needRelease = true;
 
-        IDebugClient m_client;
+        IDebugClient5 m_client;
         IDebugDataSpaces m_spaces;
         IDebugDataSpaces2 m_spaces2;
         IDebugDataSpacesPtr m_spacesPtr;
@@ -28,7 +29,7 @@ namespace Microsoft.Diagnostics.Runtime
         IDebugSystemObjects3 m_systemObjects3;
 
         uint m_instance = 0;
-        private bool m_disposed;
+        private bool m_disposed, m_processing;
 
         byte[] m_ptrBuffer = new byte[IntPtr.Size];
         private List<ModuleInfo> m_modules;
@@ -53,7 +54,7 @@ namespace Microsoft.Diagnostics.Runtime
             if (!File.Exists(dumpFile))
                 throw new FileNotFoundException(dumpFile);
 
-            IDebugClient client = CreateIDebugClient();
+            IDebugClient5 client = CreateIDebugClient();
             int hr = client.OpenDumpFile(dumpFile);
 
             if (hr != 0)
@@ -65,7 +66,7 @@ namespace Microsoft.Diagnostics.Runtime
             m_control.WaitForEvent(0, 0xffffffff);
         }
 
-        public DbgEngDataReader(IDebugClient client)
+        public DbgEngDataReader(IDebugClient5 client)
         {
             //* We need to be very careful to not cleanup the IDebugClient interfaces
             // * (that is, detach from the target process) if we created this wrapper
@@ -80,9 +81,32 @@ namespace Microsoft.Diagnostics.Runtime
             s_needRelease = false;
         }
 
-        public DbgEngDataReader(int pid, AttachFlag flags, uint msecTimeout)
+        public DbgEngDataReader(String commandLine, String workingDirectory)
         {
-            IDebugClient client = CreateIDebugClient();
+            var client = CreateIDebugClient();
+            CreateClient(client);
+
+            string env = null; // GetEnvironment();
+            DEBUG_CREATE_PROCESS_OPTIONS options = new DEBUG_CREATE_PROCESS_OPTIONS();
+            options.CreateFlags = (DEBUG_CREATE_PROCESS)3;
+            int hr = client.CreateProcessAndAttach2(0, commandLine, ref options, (uint)Marshal.SizeOf(typeof(DEBUG_CREATE_PROCESS_OPTIONS)), 
+                workingDirectory, env, 0, DEBUG_ATTACH.DEFAULT);
+            if (hr < 0)
+                throw new Exception(String.Format("IDebugClient5::CreateProcessAndAttach2, HRESULT: 0x{1:x8}", hr));
+
+            // initial break FIXME: is it necessary?
+            //hr = m_control.WaitForEvent(0, msecTimeout);
+
+            //if (hr == 1)
+            //    throw new TimeoutException("Break in did not occur within the allotted timeout.");
+            //else if (hr != 0)
+            //    throw new ClrDiagnosticsException(String.Format("Could not start: {0}, HRESULT: 0x{1:x8}", commandLine, hr), 
+            //        ClrDiagnosticsException.HR.DebuggerError);
+        }
+
+        public DbgEngDataReader(int pid, AttachFlag flags, uint timeout = msecTimeout)
+        {
+            var client = CreateIDebugClient();
             CreateClient(client);
 
             DEBUG_ATTACH attach = (flags == AttachFlag.Invasive) ? DEBUG_ATTACH.DEFAULT : DEBUG_ATTACH.NONINVASIVE;
@@ -92,12 +116,35 @@ namespace Microsoft.Diagnostics.Runtime
                 hr = client.AttachProcess(0, (uint)pid, attach);
 
             if (hr == 0)
-                hr = m_control.WaitForEvent(0, msecTimeout);
+                hr = m_control.WaitForEvent(0, timeout);
 
             if (hr == 1)
                 throw new TimeoutException("Break in did not occur within the allotted timeout.");
             else if (hr != 0)
                 throw new ClrDiagnosticsException(String.Format("Could not attach to pid {0:X}, HRESULT: 0x{1:x8}", pid, hr), ClrDiagnosticsException.HR.DebuggerError);
+        }
+
+        public DEBUG_STATUS ProcessEvents(uint timeout)
+        {
+            if (m_processing)
+                throw new InvalidOperationException("Cannot call ProcessEvents reentrantly.");
+
+            if (m_disposed)
+                return DEBUG_STATUS.NO_DEBUGGEE;
+
+            m_processing = true;
+            int hr = m_control.WaitForEvent(0, timeout);
+            m_processing = false;
+
+            if (hr < 0 && (uint)hr != 0x8000000A)
+                throw new ClrDiagnosticsException(String.Format("IDebugControl::WaitForEvent: 0x{0:x8}", hr), ClrDiagnosticsException.HR.DebuggerError);
+
+            DEBUG_STATUS status;
+            hr = m_control.GetExecutionStatus(out status);
+            if (hr < 0)
+                throw new ClrDiagnosticsException(String.Format("IDebugControl::GetExecutionStatus: 0x{0:x8}", hr), ClrDiagnosticsException.HR.DebuggerError);
+
+            return status;
         }
 
 
@@ -155,13 +202,13 @@ namespace Microsoft.Diagnostics.Runtime
             }
         }
 
-        private static IDebugClient CreateIDebugClient()
+        private static IDebugClient5 CreateIDebugClient()
         {
             Guid guid = new Guid("27fe5639-8407-4f47-8364-ee118fb08ac8");
             object obj;
             NativeMethods.DebugCreate(ref guid, out obj);
 
-            IDebugClient client = (IDebugClient)obj;
+            var client = (IDebugClient5)obj;
             return client;
         }
 
@@ -171,7 +218,7 @@ namespace Microsoft.Diagnostics.Runtime
         }
 
 
-        internal IDebugClient DebuggerInterface
+        public IDebugClient5 DebuggerInterface
         {
             get { return m_client; }
         }
@@ -294,7 +341,7 @@ namespace Microsoft.Diagnostics.Runtime
             return m_symbols.GetModuleParameters((uint)count, bases, (uint)start, mods);
         }
 
-        private void CreateClient(IDebugClient client)
+        private void CreateClient(IDebugClient5 client)
         {
             m_client = client;
 

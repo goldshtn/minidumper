@@ -2787,7 +2787,7 @@ namespace Microsoft.Diagnostics.Runtime
         /// </summary>
         /// <param name="client">The dbgeng IDebugClient object.  We will query interface on this for IDebugClient.</param>
         /// <returns>A DataTarget instance.</returns>
-        public static DataTarget CreateFromDebuggerInterface(Microsoft.Diagnostics.Runtime.Interop.IDebugClient client)
+        public static DataTarget CreateFromDebuggerInterface(Microsoft.Diagnostics.Runtime.Interop.IDebugClient5 client)
         {
             DbgEngDataReader reader = new DbgEngDataReader(client);
             DataTargetImpl dataTarget = new DataTargetImpl(reader, reader.DebuggerInterface);

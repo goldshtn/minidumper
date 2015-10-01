@@ -30,8 +30,10 @@ namespace DumpWriter
         private TextWriter _logger;
         private C5.TreeDictionary<ulong, ulong> _majorClrRegions = new C5.TreeDictionary<ulong, ulong>();
         private C5.TreeDictionary<ulong, ulong> _otherClrRegions = new C5.TreeDictionary<ulong, ulong>();
-        private int _pid;
         private DumpType _dumpType;
+        private IDataReader _dbgEngine;
+        private int _pid;
+        private IntPtr _hProcess;
         private IEnumerator<C5.KeyValuePair<ulong, ulong>> _regionEnumerator = null;
         private BlockingCollection<DumpedSegment> _dumpedSegments = new BlockingCollection<DumpedSegment>();
         private FileStream _dumpFileStream;
@@ -52,9 +54,7 @@ namespace DumpWriter
             if (_dumpType == DumpType.Minimal)
                 return;
 
-            var readerType = typeof(DataTarget).Assembly.GetType("Microsoft.Diagnostics.Runtime.LiveDataReader");
-            var reader = (IDataReader)Activator.CreateInstance(readerType, _pid);
-            var readerLogger = new DumpReaderLogger(reader);
+            var readerLogger = new DumpReaderLogger(_dbgEngine);
             var target = DataTarget.CreateFromDataReader(readerLogger);
 
             foreach (var clrVersion in target.ClrVersions)
@@ -328,25 +328,19 @@ namespace DumpWriter
             CallbackOutput.MemoryInfo.Continue = true;
         }
 
-        public DumpWriter(TextWriter logger = null)
+        public DumpWriter(IDataReader dbgEngine, IntPtr hProcess, int pid, TextWriter logger = null)
         {
+            _dbgEngine = dbgEngine;
+            _pid = pid;
+            _hProcess = hProcess;
             _logger = logger ?? TextWriter.Null;
         }
 
-        public void Dump(int pid, DumpType dumpType, string fileName, bool writeAsync = false, string dumpComment = null)
+        public void Dump(DumpType dumpType, string fileName, bool writeAsync = false, string dumpComment = null)
         {
-            _pid = pid;
             _dumpType = dumpType;
             _spillSegmentsAsynchronously = writeAsync;
             dumpComment = dumpComment ?? ("DumpWriter: " + _dumpType.ToString());
-
-            IntPtr hProcess = DumpNativeMethods.OpenProcess(
-                ProcessAccessFlags.QueryInformation | ProcessAccessFlags.VirtualMemoryRead | ProcessAccessFlags.DuplicateHandle,
-                false,
-                (uint)_pid
-                );
-            if (hProcess == IntPtr.Zero)
-                throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", _pid, Marshal.GetLastWin32Error()));
 
             _dumpFileStream = new FileStream(fileName, FileMode.Create);
 
@@ -368,7 +362,7 @@ namespace DumpWriter
                 MINIDUMP_TYPE.MiniDumpWithHandleData | MINIDUMP_TYPE.MiniDumpWithFullMemoryInfo;
             Stopwatch sw = Stopwatch.StartNew();
             bool success = DumpNativeMethods.MiniDumpWriteDump(
-                hProcess,
+                _hProcess,
                 (uint)_pid,
                 _dumpFileStream.SafeFileHandle.DangerousGetHandle(),
                 nativeDumpType,
@@ -392,7 +386,6 @@ namespace DumpWriter
             }
 
             userStreamParam.Delete();
-            DumpNativeMethods.CloseHandle(hProcess);
             _dumpFileStream.Close();
         }
 
