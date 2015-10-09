@@ -30,8 +30,8 @@ namespace MiniDumper
         //[Option('r', HelpText = "Dump using a clone.")]
         //public bool CloneProcess { get; set; }
 
-        [Option('e', Default = 2, HelpText ="Write a dump when the process encounters an unhandled exception. " +
-            "Include the 1 to create dump on first chance exceptions.")]
+        [Option('e', HelpText ="Write a dump when the process encounters an unhandled exception. " +
+            "Include the 1 to create dump on first chance exceptions, include the 2 to create dump on second chance exceptions.")]
         public int DumpOnException { get; set; }
 
         [Option('b', HelpText = "Treat debug breakpoints as exceptions (otherwise ignore them).")]
@@ -49,8 +49,8 @@ namespace MiniDumper
         [Option('n', HelpText = "Number of dumps to write before exiting.", Default = 1)]
         public int NumberOfDumps { get; set; }
 
-        [Option('o', HelpText = "Overwrite an existing dump file.")]
-        public bool OverwriteExistingFile { get; set; }
+        [Option('t', HelpText = "Write a dump when the process terminates.")]
+        public bool DumpOnProcessTerminate { get; set; }
 
         [Value(0, Required = true)]
         public String ProcessInfo { get; set; }

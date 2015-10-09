@@ -26,3 +26,4 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyFileVersion("0.9.3.0")]
 
 [assembly:InternalsVisibleTo("DumpWriter")]
+[assembly:InternalsVisibleTo("MiniDumper")]

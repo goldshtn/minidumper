@@ -1,5 +1,6 @@
 ﻿using Microsoft.Diagnostics.Runtime.Interop;
 using System;
+using System.IO;
 using System.Text;
 
 namespace MiniDumper
@@ -14,11 +15,9 @@ namespace MiniDumper
 
     class DebuggerListener : IDebugOutputCallbacks, IDebugEventCallbacks
     {
-        #region Fields
         // FIXME output should be something configurable, such as TextWriter
-        DEBUG_OUTPUT _outputMask;
-        StringBuilder _output = new StringBuilder();
-        #endregion
+        readonly DEBUG_OUTPUT _outputMask;
+        readonly TextWriter _output;
 
         #region Events
         public delegate void ModuleEventHandler(DebuggerListener dbg, ModuleEventArgs args);
@@ -42,7 +41,9 @@ namespace MiniDumper
         public event ExitProcessEventHandler ExitProcessEvent;
         #endregion
 
-        public DebuggerListener() { 
+        public DebuggerListener(TextWriter output, DEBUG_OUTPUT mask = DEBUG_OUTPUT.NORMAL) {
+            _outputMask = mask;
+            _output = output ?? TextWriter.Null;
         }
 
         public void StartListening(IDebugClient5 client)
@@ -61,7 +62,7 @@ namespace MiniDumper
         public int Output(DEBUG_OUTPUT Mask, string Text)
         {
             if (_output != null && (_outputMask & Mask) != 0)
-                _output.Append(Text);
+                _output.WriteLine(Text);
 
             return 0;
         }
