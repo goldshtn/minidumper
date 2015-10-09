@@ -18,6 +18,9 @@ namespace MiniDumper
         [DllImport("kernel32.dll", CallingConvention = CallingConvention.Winapi, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool DebugSetProcessKillOnExit([In] bool flag);
+
+        [DllImport("kernel32.dll", CallingConvention = CallingConvention.Winapi, SetLastError = true)]
+        public static extern int GetProcessId([In] IntPtr hProcess);
     }
 
     class Program
@@ -25,7 +28,6 @@ namespace MiniDumper
         static void TakeDumps(CommandLineOptions options)
         {
             ValidateOptions(options);
-            var pid = GetTargetProcessId(options);
 
             // FIXME nicely print defined options
             /*
@@ -58,14 +60,36 @@ Press Ctrl-C to end monitoring without terminating the process.
 ^C
 [17:55:23] Dump count not reached.*/
 
-            Console.WriteLine("Dumping process id {0}...", pid);
 
-            var dbg = new DbgEngDataReader("notepad", "c:\\temp");
+
+            int pid; IntPtr hProcess;
+            DumpWriter.DumpWriter dumper = null;
+
+            Console.Write("pid = ");
+            pid = Int32.Parse(Console.ReadLine());
+
+            //var dbg = new DbgEngDataReader("d:\\temp\\test.exe", "d:\\temp");
+            var dbg = new DbgEngDataReader(pid, AttachFlag.Invasive, 1000);
+            hProcess = Process.GetProcessById(pid).Handle;
+            dumper = new DumpWriter.DumpWriter(dbg, hProcess, pid, options.Verbose ? Console.Out : null);
 
             // setup listener
             var dbglstn = new DebuggerListener();
             dbglstn.ModuleLoadEvent += (d, ev) => {
                 Console.WriteLine("Module loaded: {0}", ev.ImageName);
+            };
+            dbglstn.CreateProcessEvent += (d, ev) => {
+                hProcess = (IntPtr)ev.Handle;
+                pid = Native.GetProcessId(hProcess);
+                // FIXME dumping
+                Console.WriteLine("Dumping process id {0}...", pid);
+                dumper = new DumpWriter.DumpWriter(dbg, hProcess, pid, options.Verbose ? Console.Out : null);
+            };
+            dbglstn.FirstChanceExceptionEvent += (d, ev) => {
+                var filename = "d:\\temp\\test.exe.dmp";
+                dumper.Dump(OptionToDumpType(options), filename, options.Async);
+                Console.WriteLine("Dump generated successfully, file size {0:N0} bytes",
+                    new FileInfo(filename).Length);
             };
 
             dbglstn.StartListening(dbg.DebuggerInterface);
@@ -77,27 +101,15 @@ Press Ctrl-C to end monitoring without terminating the process.
                 dbg.Dispose();
             };
 
+            // create dumper
+
+            // FIXME do something about it
+
+            // FIXME serve events (like first changes etc.)
             DEBUG_STATUS status;
             do {
                 status = dbg.ProcessEvents(0xffff);
             } while (status != DEBUG_STATUS.NO_DEBUGGEE);
-
-            // FIXME Better communication - add Ctrl + C handler
-            //var dumper = new DumpWriter.DumpWriter(options.Verbose ? Console.Out : null);
-
-            //int numberOfDumpsTaken = 0;
-            //while (numberOfDumpsTaken < options.NumberOfDumps) {
-
-                // FIXME dump logic here
-                //dumper.Dump(
-                //    pid,
-                //    OptionToDumpType(options),
-                //    options.DumpFileName,
-                //    writeAsync: options.Async
-                //    );
-                //Console.WriteLine("Dump generated successfully, file size {0:N0} bytes",
-                //    new FileInfo(options.DumpFileName).Length);
-            //}
         }
 
         private static DumpType OptionToDumpType(CommandLineOptions options)
@@ -119,17 +131,19 @@ Press Ctrl-C to end monitoring without terminating the process.
             return null;
         }
 
-        private static int GetTargetProcessId(CommandLineOptions options)
+        private static void GetTargetProcess(CommandLineOptions options, out int pid, out IntPtr hProcess)
         {
             if (options.ProcessInfo != null) {
-                int pid;
                 if (Int32.TryParse(options.ProcessInfo, out pid)) {
-                    return pid;
+                    hProcess = Process.GetProcessById(pid).Handle;
+                    return;
                 }
                 // not numeric - let's try to find it by name
                 var procs = Process.GetProcessesByName(options.ProcessInfo);
                 if (procs.Length == 1) {
-                    return procs[0].Id;
+                    pid = procs[0].Id;
+                    hProcess = procs[0].Handle;
+                    return;
                 }
                 if (procs.Length > 1) {
                     throw new ArgumentException("There is more than one process with the specified name");
@@ -166,22 +180,6 @@ Press Ctrl-C to end monitoring without terminating the process.
 
         static void Main(string[] args)
         {
-            //var dumpType = DumpType.MinimalWithFullCLRHeap;
-            //bool dumpOnFirstChanceException = false, dumpOnSecondChanceException = false, 
-            //    treatBreakpointAsException = false, cloneProcess = false, installAsSystemDebugger = false, 
-            //    showsDebugLogs = false, overwriteExistingDumpFile = false, dumpOnTermination = false, 
-            //    waitForProcess = false, showHelp = false;
-            //String exceptionFilter = null;
-
-
-            //var p = new OptionSet {
-            //    { "b", "Treat debug breakpoints as exceptions (otherwise ignore them).", v => treatBreakpointAsException = v != null },
-            //    { "e=", "Treat debug breakpoints as exceptions (otherwise ignore them).", v => treatBreakpointAsException = v != null },
-            //    { "log=", "a path to the folder where transaction log backups are stored", v => logPath = v },
-            //    { "h|help", "show help usage", v => showHelp = v != null },
-            //    { "m|mirror", "if the database is mirrored we will restore the mirroring session", v => checkMirror = v != null },
-            //};
-
             try {
                 var result = Parser.Default.ParseArguments<CommandLineOptions>(args);
                 result.WithParsed(TakeDumps);

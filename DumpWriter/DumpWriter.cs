@@ -59,7 +59,7 @@ namespace DumpWriter
 
             foreach (var clrVersion in target.ClrVersions)
             {
-                var runtime = target.CreateRuntime(clrVersion.TryDownloadDac());
+                var runtime = clrVersion.CreateRuntime();
 
                 AddCLRRegions(runtime);
 
@@ -351,8 +351,7 @@ namespace DumpWriter
                 _dumpType == DumpType.FullMemoryExcludingSafeRegions ||
                 _dumpType == DumpType.MinimalWithFullCLRHeap
                 );
-            if (_needMemoryCallbacks || _spillSegmentsAsynchronously)
-            {
+            if (_needMemoryCallbacks || _spillSegmentsAsynchronously) {
                 callbackParam.CallbackRoutine = CallbackRoutine;
             }
 
