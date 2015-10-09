@@ -26,12 +26,9 @@ namespace MiniDumper
             "at the expense of higher memory usage.")]
         public bool Async { get; set; }
 
-        [Option('r', HelpText = "Dump using a clone.")]
-        public bool CloneProcess { get; set; }
-
-        [Option('h', HelpText = "Write dump if a process has a hung window (does not respond to window " +
-            "messages for at least 5 seconds)")]
-        public bool DumpOnWindowHang { get; set; }
+        // FUTURE
+        //[Option('r', HelpText = "Dump using a clone.")]
+        //public bool CloneProcess { get; set; }
 
         [Option('e', Default = 2, HelpText ="Write a dump when the process encounters an unhandled exception. " +
             "Include the 1 to create dump on first chance exceptions.")]
@@ -54,12 +51,6 @@ namespace MiniDumper
 
         [Option('o', HelpText = "Overwrite an existing dump file.")]
         public bool OverwriteExistingFile { get; set; }
-
-        [Option('i', HelpText = "Install as the AeDebug postmortem debugger.")]
-        public String DumpFolderForInstalledVersion { get; set; }
-
-        [Option('u', HelpText = "Uninstalls minidumper, restores previous settings for the AeDebug.")]
-        public bool Uninstall { get; set; }
 
         [Value(0, Required = true)]
         public String ProcessInfo { get; set; }
