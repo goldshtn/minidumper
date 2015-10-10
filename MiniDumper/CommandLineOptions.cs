@@ -34,9 +34,6 @@ namespace MiniDumper
             "Include the 1 to create dump on first chance exceptions, include the 2 to create dump on second chance exceptions.")]
         public int DumpOnException { get; set; }
 
-        [Option('b', HelpText = "Treat debug breakpoints as exceptions (otherwise ignore them).")]
-        public bool TreatBreakpointAsException { get; set; }
-
         [Option('l', HelpText = "Display the debug logging of the process + diagnostics info from the minidumper.")]
         public bool Verbose { get; set; }
 
