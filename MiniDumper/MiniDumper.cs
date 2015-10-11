@@ -25,7 +25,7 @@ namespace MiniDumper
         public static extern int GetProcessId([In] IntPtr hProcess);
     }
 
-    class MiniDumper
+    class MiniDumper : IDisposable
     {
         const uint CLRDBG_NOTIFICATION_EXCEPTION_CODE = 0x04242420;
         const uint CTRL_C_EXCEPTION_CODE = 0x40010005;
@@ -40,8 +40,106 @@ namespace MiniDumper
         private readonly string processName;
         private readonly TextWriter logger;
         private readonly DumpType dumpType;
-        private readonly bool writeAsync, dumpOnTerminate;
-        private readonly int numberOfDumps;
+        private readonly bool writeAsync;
         private readonly Regex rgxFilter;
+
+        private bool detached;
+
+        public MiniDumper(IDebugClient5 client, string dumpFolder, int pid, IntPtr hProcess, String processName,
+            TextWriter logger, DumpType dumpType, bool writeAsync, String filter)
+        {
+            this.client = client;
+            this.dumpFolder = dumpFolder;
+            this.pid = pid;
+            this.hProcess = hProcess;
+            this.processName = processName;
+            this.logger = logger;
+            this.dumpType = dumpType;
+            this.writeAsync = writeAsync;
+            this.rgxFilter = new Regex((filter ?? "*").Replace("*", ".*").Replace('?', '.'),
+                RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+            target = DataTarget.CreateFromDebuggerInterface(client);
+
+            Console.WriteLine("CLR Version(s): {0}", String.Join(", ", target.ClrVersions.Select(clrver => clrver.Version.ToString())));
+            Console.WriteLine();
+
+            dumper = new DumpWriter.DumpWriter(target.DataReader, hProcess, pid, logger);
+        }
+
+        public void DumpOnException(DebuggerListener o, EXCEPTION_RECORD ev)
+        {
+            if (ev.ExceptionCode == CLRDBG_NOTIFICATION_EXCEPTION_CODE) {
+                // based on https://social.msdn.microsoft.com/Forums/vstudio/en-US/bca092d4-d2b5-49ef-8bbc-cbce2c67aa89/net-40-firstchance-exception-0x04242420?forum=clr
+                // it's a "notification exception" and can be safely ignored
+                return;
+            }
+            if (ev.ExceptionCode == CTRL_C_EXCEPTION_CODE) {
+                // we will also ignore CTRL+C events
+                return;
+            }
+            // FIXME print information about the exception (decode it)
+            uint threadId;
+            int hr = ((IDebugSystemObjects)client).GetCurrentThreadSystemId(out threadId);
+            if (hr != 0) {
+                Marshal.ThrowExceptionForHR(hr);
+            }
+            ClrException managedException = null;
+            foreach (var clrver in target.ClrVersions) {
+                var runtime = clrver.CreateRuntime();
+                var thr = runtime.Threads.FirstOrDefault(t => t.OSThreadId == threadId);
+                if (thr != null) {
+                    managedException = thr.CurrentException;
+                    break;
+                }
+            }
+            var exceptionInfo = String.Format("{0:X}.{1} (\"{2}\")", ev.ExceptionCode,
+                managedException != null ? managedException.Type.Name : "Native",
+                managedException != null ? managedException.Message : "N/A");
+
+            PrintTrace("Exception: " + exceptionInfo);
+
+            Debug.Assert(dumper != null);
+            Debug.Assert(rgxFilter != null);
+
+            if (rgxFilter.IsMatch(exceptionInfo)) {
+                var filename = GetDumpFileName();
+                PrintTrace(String.Format("Dumping process memory to file: {0}", filename));
+                // FIXME dump must have the exception record set
+                //dumper.Dump(dumpType, filename, writeAsync, dumpComment);
+            }
+        }
+
+        public void DumpOnProcessExit(DebuggerListener o, int exitCode)
+        {
+            detached = true;
+            PrintTrace(String.Format("Process has terminated."));
+            Debug.Assert(dumper != null);
+            // FIXME dump
+        }
+
+        String GetDumpFileName()
+        {
+            return Path.Combine(dumpFolder, String.Format("{0}_{1:yyMMdd_HHmmss}.dmp", processName, DateTime.Now));
+        }
+
+        void PrintTrace(String message)
+        {
+            Console.WriteLine("[{0:HH:mm.ss}] {1}", DateTime.Now, message);
+        }
+
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (disposing) {
+                target.Dispose();
+            }
+        }
     }
 }
