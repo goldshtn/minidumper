@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Runtime.InteropServices;
 
 namespace MiniDumper
 {
@@ -15,22 +16,11 @@ namespace MiniDumper
 
     class DebuggerListener : IDebugOutputCallbacks, IDebugEventCallbacks
     {
-        // FIXME output should be something configurable, such as TextWriter
         readonly DEBUG_OUTPUT _outputMask;
         readonly TextWriter _output;
 
         #region Events
-        public delegate void ModuleEventHandler(DebuggerListener dbg, ModuleEventArgs args);
-        public event ModuleEventHandler ModuleLoadEvent;
-        public event ModuleEventHandler ModuleUnloadEvent;
-
-        public delegate void CreateThreadEventHandler(DebuggerListener dbg, CreateThreadArgs args);
-        public event CreateThreadEventHandler ThreadCreateEvent;
-
-        public delegate void ExitThreadEventHandler(DebuggerListener dbg, int exitCode);
-        public event ExitThreadEventHandler ExitThreadEvent;
-
-        public delegate void ExceptionEventHandler(DebuggerListener dbg, EXCEPTION_RECORD64 ex);
+        public delegate void ExceptionEventHandler(DebuggerListener dbg, EXCEPTION_RECORD ex);
         public event ExceptionEventHandler FirstChanceExceptionEvent;
         public event ExceptionEventHandler SecondChanceExceptionEvent;
 
@@ -103,25 +93,7 @@ namespace MiniDumper
             return (int)DEBUG_STATUS.BREAK;
         }
 
-        public int CreateThread(ulong Handle, ulong DataOffset, ulong StartOffset)
-        {
-            CreateThreadEventHandler evt = ThreadCreateEvent;
-            if (evt != null)
-                evt(this, new CreateThreadArgs(Handle, DataOffset, StartOffset));
-
-            return 0;
-        }
-
-        public int ExitThread(uint ExitCode)
-        {
-            ExitThreadEventHandler evt = ExitThreadEvent;
-            if (evt != null)
-                evt(this, (int)ExitCode);
-
-            return 0;
-        }
-
-        public int Exception(ref EXCEPTION_RECORD64 Exception, uint FirstChance)
+        public int Exception(ref EXCEPTION_RECORD Exception, uint FirstChance)
         {
             ExceptionEventHandler evt = (FirstChance == 1) ? FirstChanceExceptionEvent : SecondChanceExceptionEvent;
             if (evt != null)
@@ -130,91 +102,51 @@ namespace MiniDumper
             return (int)DEBUG_STATUS.BREAK;
         }
 
-        public int LoadModule(ulong ImageFileHandle, ulong BaseOffset, uint ModuleSize, string ModuleName, string ImageName, uint CheckSum, uint TimeDateStamp)
-        {
-            ModuleEventHandler evt = ModuleLoadEvent;
-            if (evt != null)
-                evt(this, new ModuleEventArgs(ImageFileHandle, BaseOffset, ModuleSize, ModuleName, ImageName, CheckSum, TimeDateStamp));
-
-            return 0;
-        }
-
-        public int UnloadModule(string ImageBaseName, ulong BaseOffset)
-        {
-            ModuleEventHandler evt = ModuleUnloadEvent;
-            if (evt != null)
-                evt(this, new ModuleEventArgs(ImageBaseName, BaseOffset));
-
-            return 0;
-        }
-
         public int SessionStatus(DEBUG_SESSION Status)
         {
-            throw new NotImplementedException();
+            return (int)DEBUG_STATUS.GO;
         }
 
         public int SystemError(uint Error, uint Level)
         {
-            throw new NotImplementedException();
+            return (int)DEBUG_STATUS.GO;
         }
 
         public int ChangeDebuggeeState(DEBUG_CDS Flags, ulong Argument)
         {
-            throw new NotImplementedException();
+            return (int)DEBUG_STATUS.GO;
         }
 
         public int ChangeEngineState(DEBUG_CES Flags, ulong Argument)
         {
-            throw new NotImplementedException();
+            return (int)DEBUG_STATUS.GO;
         }
 
         public int ChangeSymbolState(DEBUG_CSS Flags, ulong Argument)
         {
-            throw new NotImplementedException();
+            return (int)DEBUG_STATUS.GO;
+        }
+
+        public int CreateThread([In] ulong Handle, [In] ulong DataOffset, [In] ulong StartOffset)
+        {
+            return (int)DEBUG_STATUS.GO;
+        }
+
+        public int ExitThread([In] uint ExitCode)
+        {
+            return (int)DEBUG_STATUS.GO;
+        }
+
+        public int LoadModule([In] ulong ImageFileHandle, [In] ulong BaseOffset, [In] uint ModuleSize, [In, MarshalAs(UnmanagedType.LPStr)] string ModuleName, [In, MarshalAs(UnmanagedType.LPStr)] string ImageName, [In] uint CheckSum, [In] uint TimeDateStamp)
+        {
+            return (int)DEBUG_STATUS.GO;
+        }
+
+        public int UnloadModule([In, MarshalAs(UnmanagedType.LPStr)] string ImageBaseName, [In] ulong BaseOffset)
+        {
+            return (int)DEBUG_STATUS.GO;
         }
         #endregion
-    }
-
-    class ModuleEventArgs
-    {
-        public ulong ImageFileHandle;
-        public ulong BaseOffset;
-        public uint ModuleSize;
-        public string ModuleName;
-        public string ImageName;
-        public uint CheckSum;
-        public uint TimeDateStamp;
-
-        public ModuleEventArgs(string imageBaseName, ulong baseOffset)
-        {
-            ImageName = imageBaseName;
-            BaseOffset = baseOffset;
-        }
-
-        public ModuleEventArgs(ulong ImageFileHandle, ulong BaseOffset, uint ModuleSize, string ModuleName, string ImageName, uint CheckSum, uint TimeDateStamp)
-        {
-            this.ImageFileHandle = ImageFileHandle;
-            this.BaseOffset = BaseOffset;
-            this.ModuleSize = ModuleSize;
-            this.ModuleName = ModuleName;
-            this.ImageName = ImageName;
-            this.CheckSum = CheckSum;
-            this.TimeDateStamp = TimeDateStamp;
-        }
-    }
-
-    class CreateThreadArgs
-    {
-        public ulong Handle;
-        public ulong DataOffset;
-        public ulong StartOffset;
-
-        public CreateThreadArgs(ulong handle, ulong data, ulong start)
-        {
-            Handle = handle;
-            DataOffset = data;
-            StartOffset = start;
-        }
     }
 
     class CreateProcessArgs

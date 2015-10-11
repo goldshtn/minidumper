@@ -379,6 +379,7 @@ namespace Microsoft.Diagnostics.Runtime.Interop
         THROUGH_RTL = 0x00010000, /* STACK_SIZE_PARAM_IS_A_RESERVATION */
         CREATE_NEW_CONSOLE = 0x00000010,
         DEBUG_PROCESS = 0x00000001,
+        DEBUG_ONLY_THIS_PROCESS = 0x00000002
     }
 
     [Flags]

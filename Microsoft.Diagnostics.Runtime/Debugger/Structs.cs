@@ -191,15 +191,23 @@ namespace Microsoft.Diagnostics.Runtime.Interop
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public unsafe struct EXCEPTION_RECORD64
+    public unsafe struct EXCEPTION_RECORD
     {
         public UInt32 ExceptionCode;
         public UInt32 ExceptionFlags;
-        public UInt64 ExceptionRecord;
-        public UInt64 ExceptionAddress;
+        public IntPtr ExceptionRecord;
+        public IntPtr ExceptionAddress;
         public UInt32 NumberParameters;
+#if X64
         public UInt32 __unusedAlignment;
-        public fixed UInt64 ExceptionInformation[15]; //EXCEPTION_MAXIMUM_PARAMETERS
+#endif
+#if X64
+        [MarshalAs( UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U8 )]
+        public UInt64[] ExceptionInformation;
+#else
+        [MarshalAs( UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U4 )]
+        public uint[] ExceptionInformation;
+#endif
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -1030,7 +1038,7 @@ namespace Microsoft.Diagnostics.Runtime.Interop
     [StructLayout(LayoutKind.Sequential)]
     public struct DEBUG_LAST_EVENT_INFO_EXCEPTION
     {
-        public EXCEPTION_RECORD64 ExceptionRecord;
+        public EXCEPTION_RECORD ExceptionRecord;
         public uint FirstChance;
     }
 

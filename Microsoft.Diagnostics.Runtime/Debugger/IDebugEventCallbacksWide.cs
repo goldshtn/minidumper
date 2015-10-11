@@ -21,7 +21,7 @@ namespace Microsoft.Diagnostics.Runtime.Interop
 
         [PreserveSig]
         int Exception(
-            [In] ref EXCEPTION_RECORD64 Exception,
+            [In] ref EXCEPTION_RECORD Exception,
             [In] UInt32 FirstChance);
 
         [PreserveSig]

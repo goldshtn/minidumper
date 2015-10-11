@@ -42,7 +42,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
     <OutputPath>bin\x64\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;_REDHAWK</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;_REDHAWK X64</DefineConstants>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DocumentationFile>bin\Debug\Microsoft.Diagnostics.Runtime.xml</DocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
