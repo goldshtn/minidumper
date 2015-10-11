@@ -191,7 +191,7 @@ namespace Microsoft.Diagnostics.Runtime.Interop
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public unsafe struct EXCEPTION_RECORD
+    public struct EXCEPTION_RECORD
     {
         public UInt32 ExceptionCode;
         public UInt32 ExceptionFlags;
@@ -202,7 +202,23 @@ namespace Microsoft.Diagnostics.Runtime.Interop
         public UInt32 __unusedAlignment;
 #endif
 #if X64
-        [MarshalAs( UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U8 )]
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U8)]
+        public UInt64[] ExceptionInformation;
+#else
+        [MarshalAs( UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U4 )]
+        public uint[] ExceptionInformation;
+#endif
+    }
+
+    public struct EXCEPTION_RECORD_GENERIC
+    {
+        public UInt32 ExceptionCode;
+        public UInt32 ExceptionFlags;
+        public IntPtr ExceptionRecord;
+        public IntPtr ExceptionAddress;
+        public UInt32 NumberParameters;
+#if X64
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U8)]
         public UInt64[] ExceptionInformation;
 #else
         [MarshalAs( UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U4 )]

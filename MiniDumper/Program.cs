@@ -217,7 +217,7 @@ namespace MiniDumper
                 if (options.DumpOnException == 1) {
                     listener.FirstChanceExceptionEvent += miniDumper.DumpOnException;
                 }
-                listener.SecondChanceExceptionEvent += miniDumper.DumpOnException;
+                //FIXME: listener.SecondChanceExceptionEvent += miniDumper.DumpOnException;
             }
             if (options.DumpOnProcessTerminate) {
                 listener.ExitProcessEvent += miniDumper.DumpOnProcessExit;

@@ -17,6 +17,11 @@ namespace MiniDumper
 {
     class Native
     {
+#if X64
+        public const int CONTEXT_SIZE = 1232;
+#else
+        public const int CONTEXT_SIZE = 716;
+#endif
         [DllImport("kernel32.dll", CallingConvention = CallingConvention.Winapi, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool DebugSetProcessKillOnExit([In] bool flag);
@@ -42,8 +47,6 @@ namespace MiniDumper
         private readonly DumpType dumpType;
         private readonly bool writeAsync;
         private readonly Regex rgxFilter;
-
-        private bool detached;
 
         public MiniDumper(IDebugClient5 client, string dumpFolder, int pid, IntPtr hProcess, String processName,
             TextWriter logger, DumpType dumpType, bool writeAsync, String filter)
@@ -105,14 +108,41 @@ namespace MiniDumper
             if (rgxFilter.IsMatch(exceptionInfo)) {
                 var filename = GetDumpFileName();
                 PrintTrace(String.Format("Dumping process memory to file: {0}", filename));
-                // FIXME dump must have the exception record set
-                //dumper.Dump(dumpType, filename, writeAsync, dumpComment);
+
+                var pctx = Marshal.AllocHGlobal(Native.CONTEXT_SIZE);
+                hr = ((IDebugAdvanced)client).GetThreadContext(pctx, Native.CONTEXT_SIZE);
+                if (hr != 0) {
+                    Marshal.ThrowExceptionForHR(hr);
+                }
+                IntPtr pev = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(EXCEPTION_RECORD_GENERIC)));
+                Marshal.StructureToPtr(new EXCEPTION_RECORD_GENERIC {
+                    ExceptionAddress = ev.ExceptionAddress,
+                    ExceptionFlags = ev.ExceptionFlags,
+                    ExceptionCode = ev.ExceptionCode,
+                    ExceptionRecord = IntPtr.Zero,
+                    NumberParameters = ev.NumberParameters,
+                    ExceptionInformation = ev.ExceptionInformation
+                }, pev, false);
+                var excpointers = new EXCEPTION_POINTERS {
+                    ExceptionRecord = pev,
+                    ContextRecord = pctx
+                };
+                IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(excpointers));
+                Marshal.StructureToPtr(excpointers, ptr, false);
+                var excinfo = new MINIDUMP_EXCEPTION_INFORMATION() {
+                    ThreadId = threadId,
+                    ClientPointers = true,
+                    ExceptionPointers = ptr
+                };
+                dumper.Dump(dumpType, filename, writeAsync, dumpComment, excinfo);
+                Marshal.FreeHGlobal(pev);
+                Marshal.FreeHGlobal(pctx);
+                Marshal.FreeHGlobal(ptr);
             }
         }
 
         public void DumpOnProcessExit(DebuggerListener o, int exitCode)
         {
-            detached = true;
             PrintTrace(String.Format("Process has terminated."));
             Debug.Assert(dumper != null);
             // FIXME dump

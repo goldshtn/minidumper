@@ -1,4 +1,5 @@
 ﻿using Microsoft.Diagnostics.Runtime;
+using Microsoft.Diagnostics.Runtime.Interop;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -336,7 +337,8 @@ namespace DumpWriter
             _logger = logger ?? TextWriter.Null;
         }
 
-        public void Dump(DumpType dumpType, string fileName, bool writeAsync = false, string dumpComment = null)
+        public void Dump(DumpType dumpType, string fileName, bool writeAsync = false, 
+            string dumpComment = null, MINIDUMP_EXCEPTION_INFORMATION? exceptionInfo = null)
         {
             _dumpType = dumpType;
             _spillSegmentsAsynchronously = writeAsync;
@@ -344,7 +346,8 @@ namespace DumpWriter
 
             _dumpFileStream = new FileStream(fileName, FileMode.Create);
 
-            var exceptionParam = new MINIDUMP_EXCEPTION_INFORMATION();
+            // fill the exception param
+            var exceptionParam = exceptionInfo ?? new MINIDUMP_EXCEPTION_INFORMATION();
             var userStreamParam = PrepareUserStream(dumpComment);
             var callbackParam = new MINIDUMP_CALLBACK_INFORMATION();
             _needMemoryCallbacks = (
