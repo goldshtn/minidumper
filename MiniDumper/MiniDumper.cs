@@ -15,6 +15,20 @@ using System.Text.RegularExpressions;
 
 namespace MiniDumper
 {
+    [Flags]
+    public enum ThreadAccess : int
+    {
+        TERMINATE = (0x0001),
+        SUSPEND_RESUME = (0x0002),
+        GET_CONTEXT = (0x0008),
+        SET_CONTEXT = (0x0010),
+        SET_INFORMATION = (0x0020),
+        QUERY_INFORMATION = (0x0040),
+        SET_THREAD_TOKEN = (0x0080),
+        IMPERSONATE = (0x0100),
+        DIRECT_IMPERSONATION = (0x0200)
+    }
+
     class Native
     {
 #if X64
@@ -28,6 +42,16 @@ namespace MiniDumper
 
         [DllImport("kernel32.dll", CallingConvention = CallingConvention.Winapi, SetLastError = true)]
         public static extern int GetProcessId([In] IntPtr hProcess);
+
+        [DllImport("kernel32.dll")]
+        public static extern IntPtr OpenThread(ThreadAccess dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
+
+        [DllImport("kernel32.dll")]
+        public static extern bool GetThreadContext(IntPtr hThread, IntPtr lpContext);
+
+        [DllImport("kernel32.dll", CallingConvention = CallingConvention.Winapi, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool CloseHandle([In] IntPtr hThread);
     }
 
     class MiniDumper : IDisposable
@@ -81,7 +105,7 @@ namespace MiniDumper
                 // we will also ignore CTRL+C events
                 return;
             }
-            // FIXME print information about the exception (decode it)
+            // print information about the exception (decode it)
             uint threadId;
             int hr = ((IDebugSystemObjects)client).GetCurrentThreadSystemId(out threadId);
             if (hr != 0) {
@@ -109,6 +133,7 @@ namespace MiniDumper
                 var filename = GetDumpFileName();
                 PrintTrace(String.Format("Dumping process memory to file: {0}", filename));
 
+                /* I leave the Exception context for the future
                 var pctx = Marshal.AllocHGlobal(Native.CONTEXT_SIZE);
                 hr = ((IDebugAdvanced)client).GetThreadContext(pctx, Native.CONTEXT_SIZE);
                 if (hr != 0) {
@@ -131,13 +156,15 @@ namespace MiniDumper
                 Marshal.StructureToPtr(excpointers, ptr, false);
                 var excinfo = new MINIDUMP_EXCEPTION_INFORMATION() {
                     ThreadId = threadId,
-                    ClientPointers = true,
+                    ClientPointers = false,
                     ExceptionPointers = ptr
-                };
-                dumper.Dump(dumpType, filename, writeAsync, dumpComment, excinfo);
+                }; */
+                dumper.Dump(dumpType, filename, writeAsync, dumpComment, null/* excinfo */);
+
+                /*
                 Marshal.FreeHGlobal(pev);
                 Marshal.FreeHGlobal(pctx);
-                Marshal.FreeHGlobal(ptr);
+                Marshal.FreeHGlobal(ptr);*/
             }
         }
 
@@ -145,7 +172,10 @@ namespace MiniDumper
         {
             PrintTrace(String.Format("Process has terminated."));
             Debug.Assert(dumper != null);
-            // FIXME dump
+
+            var filename = GetDumpFileName();
+            PrintTrace(String.Format("Dumping process memory to file: {0}", filename));
+            dumper.Dump(dumpType, filename, writeAsync, dumpComment, null);
         }
 
         String GetDumpFileName()

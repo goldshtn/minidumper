@@ -9,17 +9,12 @@ namespace MiniDumper
 {
     class CommandLineOptions
     {
-        [Option("mm", HelpText =
-            "Create a minimal dump file, enough to diagnose crashes and display call stacks.")]
-        public bool MinimalDump { get; set; }
-
-        [Option("mh", HelpText = 
-            "Create a dump file with the CLR heap, but without module code or unmanaged memory contents.")]
-        public bool MinimalDumpWithCLRHeap { get; set; }
-
-        [Option("ma", HelpText =
-            "Create a complete dump file with the full memory address space.")]
-        public bool FullDump { get; set; }
+        [Option('m', HelpText =
+            "Create a dump file, second paramer: \r\n" +
+            "m - a minidump  enough to diagnose crashes and display call stacks.\r\n" +
+            "h - a dump file with the CLR heap, but without module code or unmanaged memory contents\r\n" +
+            "a - a complete dump file with the full memory address space", Required = true)]
+        public char DumpType { get; set; }
 
         [Option("async", HelpText =
             "Write dump chunks to disk asynchronously. Reduces process suspension time " +

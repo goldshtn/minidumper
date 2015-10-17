@@ -106,17 +106,6 @@ namespace MiniDumper
 
         static void ValidateOptions(CommandLineOptions options)
         {
-            // rules for dumps
-            int set = 0;
-            set += options.FullDump ? 1 : 0;
-            set += options.MinimalDump ? 1 : 0;
-            set += options.MinimalDumpWithCLRHeap ? 1 : 0;
-            if (set == 0) {
-                throw new ArgumentException("No dump option specified");
-            }
-            if (set > 1) {
-                throw new ArgumentException("More than one dump option specified");
-            }
             if (String.IsNullOrEmpty(options.ProcessInfo)) {
                 throw new ArgumentException("Either a process id or process name is required");
             }
@@ -217,7 +206,7 @@ namespace MiniDumper
                 if (options.DumpOnException == 1) {
                     listener.FirstChanceExceptionEvent += miniDumper.DumpOnException;
                 }
-                //FIXME: listener.SecondChanceExceptionEvent += miniDumper.DumpOnException;
+                listener.SecondChanceExceptionEvent += miniDumper.DumpOnException;
             }
             if (options.DumpOnProcessTerminate) {
                 listener.ExitProcessEvent += miniDumper.DumpOnProcessExit;
@@ -227,11 +216,11 @@ namespace MiniDumper
 
         static DumpType OptionToDumpType(CommandLineOptions options)
         {
-            if (options.MinimalDump)
+            if (options.DumpType == 'm')
                 return DumpType.Minimal;
-            if (options.MinimalDumpWithCLRHeap)
+            if (options.DumpType == 'h')
                 return DumpType.MinimalWithFullCLRHeap;
-            if (options.FullDump)
+            if (options.DumpType == 'a')
                 return DumpType.FullMemory;
 
             // Should never get here

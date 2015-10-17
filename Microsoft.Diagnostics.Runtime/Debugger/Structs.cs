@@ -218,6 +218,8 @@ namespace Microsoft.Diagnostics.Runtime.Interop
         public IntPtr ExceptionAddress;
         public UInt32 NumberParameters;
 #if X64
+        public UInt32 unusedAlignment;
+
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U8)]
         public UInt64[] ExceptionInformation;
 #else
