@@ -71,7 +71,7 @@ namespace MiniDumper
 
         public int Breakpoint(IDebugBreakpoint Bp)
         {
-            return (int)DEBUG_STATUS.GO;
+            return (int)DEBUG_STATUS.BREAK;
         }
 
         public int CreateProcess(ulong ImageFileHandle, ulong Handle, ulong BaseOffset, uint ModuleSize, string ModuleName, string ImageName,
@@ -81,7 +81,7 @@ namespace MiniDumper
             if (evt != null)
                 evt(this, new CreateProcessArgs(ImageFileHandle, Handle, BaseOffset, ModuleSize, ModuleName, ImageName, CheckSum, TimeDateStamp, InitialThreadHandle, ThreadDataOffset, StartOffset));
 
-            return 0;
+            return (int)DEBUG_STATUS.BREAK;
         }
 
         public int ExitProcess(uint ExitCode)

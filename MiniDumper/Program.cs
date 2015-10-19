@@ -31,7 +31,8 @@ namespace MiniDumper
 
             // parse options
             var logger = options.Verbose ? Console.Out : TextWriter.Null;
-            var dumpFolder = options.DumpFolderForNewlyStartedProcess ?? Assembly.GetExecutingAssembly().CodeBase;
+            var dumpFolder = options.DumpFolderForNewlyStartedProcess ?? Path.GetDirectoryName(
+                Process.GetCurrentProcess().MainModule.FileName);
 
             // create client
             Guid guid = new Guid("27fe5639-8407-4f47-8364-ee118fb08ac8");
@@ -67,22 +68,20 @@ namespace MiniDumper
             // banner
             ShowBanner(options, pid, processName, dumpFolder);
 
+            // create minidumper and attach its events
+            var minidumper = CreateAndAttachMiniDumper(client, listener, 
+                dumpFolder, pid, hProcess, processName, logger, options);
+
             // setup Ctrl+C listener
             Console.CancelKeyPress += (o, ev) => {
                 Console.WriteLine("Ctrl + C received - detaching from a process");
                 if (!detached) {
-                    detached = true;
-                    Debug.Assert(client != null);
-                    int hr = client.DetachCurrentProcess();
-                    if (hr != 0) {
-                        Marshal.ThrowExceptionForHR(hr);
-                    }
+                    //detached = true;
+                    //DetachProcess(minidumper, client);
+                    minidumper.NumberOfDumpsTaken = options.NumberOfDumps;
+                    ev.Cancel = true;
                 }
             };
-
-            // create minidumper and attach its events
-            CreateAndAttachMiniDumper(client, listener, dumpFolder, pid, hProcess, 
-                processName, logger, options);
 
             // main debug event loop
             var control = (IDebugControl2)client;
@@ -92,6 +91,10 @@ namespace MiniDumper
                 int hr = control.WaitForEvent(0, 1000);
                 if (detached) {
                     // we are done
+                    return;
+                }
+                if (minidumper.NumberOfDumpsTaken >= options.NumberOfDumps) {
+                    DetachProcess(minidumper, client);
                     return;
                 }
                 if (hr < 0 && (uint)hr != 0x8000000A) {
@@ -116,23 +119,28 @@ namespace MiniDumper
             }
         }
 
-        static void CreateProcess(IDebugClient5 client, string processInfo, IList<string> args, bool spawnNew, out int pid, 
+        static void CreateProcess(IDebugClient5 client, string processInfo, IList<string> args, bool spawnNew, out int pid,
             out IntPtr hProcess, out string processName)
         {
             hProcess = IntPtr.Zero;
-
+            processName = null;
 
             if (Int32.TryParse(processInfo, out pid)) {
                 hProcess = Process.GetProcessById(pid).Handle;
             } else {
                 // not numeric - let's try to find it by name
-                var procs = Process.GetProcessesByName(processInfo);
-                if (procs.Length == 1) {
-                    pid = procs[0].Id;
-                    hProcess = procs[0].Handle;
-                }
-                if (procs.Length > 1) {
-                    throw new ArgumentException("There is more than one process with the specified name");
+                var procs = Process.GetProcesses();
+                foreach (var proc in procs) {
+                    try {
+                        if (processInfo.Equals(proc.MainModule.ModuleName, StringComparison.OrdinalIgnoreCase)) {
+                            pid = proc.Id;
+                            hProcess = proc.Handle;
+                            processName = proc.MainModule.ModuleName;
+                            break;
+                        }
+                    } catch {
+                        // just ignore it
+                    }
                 }
             }
             if (pid > 0) {
@@ -143,7 +151,10 @@ namespace MiniDumper
                 if (hr < 0) {
                     Marshal.ThrowExceptionForHR(hr);
                 }
-                processName = GetProcessName(client);
+                hr = ((IDebugControl2)client).WaitForEvent(0, 10000);
+                if (hr < 0 && (uint)hr != 0x8000000A) {
+                    Marshal.ThrowExceptionForHR(hr);
+                }
                 return;
             }
             if (spawnNew) {
@@ -165,6 +176,21 @@ namespace MiniDumper
                 return;
             }
             throw new ArgumentException("Something is wrong with the arguments - I wasn't able to create a process.");
+        }
+
+        static void DetachProcess(MiniDumper minidumper, IDebugClient5 client)
+        {
+            client.SetEventCallbacks(null);
+            client.SetOutputCallbacks(null);
+            minidumper.Dispose();
+            int size; 
+            if (((IDebugAdvanced2)client).Request(DEBUG_REQUEST.TARGET_CAN_DETACH, null, 0, null, 0, out size) != 0) {
+                Console.WriteLine("FIXME: I'm afraid can't detach and will wait for the process to end.");
+            }
+            int hr = client.DetachCurrentProcess();
+            if (hr != 0) {
+                Marshal.ThrowExceptionForHR(hr);
+            }
         }
 
         static void ShowBanner(CommandLineOptions options, int pid, string processName, string dumpFolder)
@@ -197,7 +223,7 @@ namespace MiniDumper
             return buffer.ToString(0, (int)size - 1);
         }
 
-        static MiniDumper CreateAndAttachMiniDumper(IDebugClient5 client, DebuggerListener listener, String dumpFolder, 
+        static MiniDumper CreateAndAttachMiniDumper(IDebugClient5 client, DebuggerListener listener, String dumpFolder,
             int pid, IntPtr hProcess, string processName, TextWriter logger, CommandLineOptions options)
         {
             var miniDumper = new MiniDumper(client, dumpFolder, pid, hProcess, processName, logger,
@@ -205,8 +231,9 @@ namespace MiniDumper
             if (options.DumpOnException >= 1) {
                 if (options.DumpOnException == 1) {
                     listener.FirstChanceExceptionEvent += miniDumper.DumpOnException;
+                } else {
+                    listener.SecondChanceExceptionEvent += miniDumper.DumpOnException;
                 }
-                listener.SecondChanceExceptionEvent += miniDumper.DumpOnException;
             }
             if (options.DumpOnProcessTerminate) {
                 listener.ExitProcessEvent += miniDumper.DumpOnProcessExit;
