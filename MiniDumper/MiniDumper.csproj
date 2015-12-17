@@ -61,8 +61,8 @@
     </StartupObject>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="CommandLine, Version=2.0.261.0, Culture=neutral, PublicKeyToken=de6f01bd326f8c32, processorArchitecture=MSIL">
-      <HintPath>..\packages\CommandLineParser.2.0.261-beta\lib\net45\CommandLine.dll</HintPath>
+    <Reference Include="CommandLine, Version=2.0.275.0, Culture=neutral, PublicKeyToken=de6f01bd326f8c32, processorArchitecture=MSIL">
+      <HintPath>..\packages\CommandLineParser.2.0.275-beta\lib\net45\CommandLine.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -76,14 +76,45 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CommandLineOptions.cs" />
-    <Compile Include="DebuggerListener.cs" />
     <Compile Include="MiniDumper.cs" />
-    <Compile Include="Program.cs" />
+    <Compile Include="Debugger.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Win32\ComPtr.cs" />
+    <Compile Include="Win32\Contants.cs" />
+    <Compile Include="Win32\Debugging\CONTINUE_STATUS.cs" />
+    <Compile Include="Win32\Debugging\CREATE_PROCESS_DEBUG_INFO.cs" />
+    <Compile Include="Win32\Debugging\CREATE_THREAD_DEBUG_INFO.cs" />
+    <Compile Include="Win32\Debugging\DEBUG_EVENT.cs" />
+    <Compile Include="Win32\Debugging\DEBUG_EVENT_CODE.cs" />
+    <Compile Include="Win32\Debugging\EXCEPTION_DEBUG_INFO.cs" />
+    <Compile Include="Win32\Debugging\EXCEPTION_RECORD.cs" />
+    <Compile Include="Win32\Debugging\EXIT_PROCESS_DEBUG_INFO.cs" />
+    <Compile Include="Win32\Debugging\EXIT_THREAD_DEBUG_INFO.cs" />
+    <Compile Include="Win32\Debugging\LOAD_DLL_DEBUG_INFO.cs" />
+    <Compile Include="Win32\Debugging\NativeMethods.cs" />
+    <Compile Include="Win32\Debugging\OUTPUT_DEBUG_STRING_INFO.cs" />
+    <Compile Include="Win32\Debugging\PTHREAD_START_ROUTINE.cs" />
+    <Compile Include="Win32\Debugging\RIP_INFO.cs" />
+    <Compile Include="Win32\Debugging\UNLOAD_DLL_DEBUG_INFO.cs" />
+    <Compile Include="Win32\Handles\NativeMethods.cs" />
+    <Compile Include="Win32\HResults.cs" />
+    <Compile Include="Win32\Interop\SecurityAttributes.cs" />
+    <Compile Include="Win32\LastWin32ErrorException.cs" />
+    <Compile Include="Win32\NtStatus.cs" />
+    <Compile Include="Win32\Processes\NativeEnums.cs" />
+    <Compile Include="Win32\Processes\NativeMethods.cs" />
+    <Compile Include="Win32\Processes\NativeStructs.cs" />
+    <Compile Include="Win32\Processes\ProcessCreationFlags.cs" />
+    <Compile Include="Win32\Processes\PROCESS_INFORMATION.cs" />
+    <Compile Include="Win32\Processes\SafeProcessHandle.cs" />
+    <Compile Include="Win32\Processes\SafeThreadHandle.cs" />
+    <Compile Include="Win32\Processes\Startupinfo.cs" />
+    <Compile Include="Win32\UnicodeString.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
+    <None Include="Win32\vschromium-LICENSE" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="FodyWeavers.xml">
@@ -94,10 +125,6 @@
     <ProjectReference Include="..\DumpWriter\DumpWriter.csproj">
       <Project>{1c19b4d7-e6a6-4a9a-8495-8231fa167d1c}</Project>
       <Name>DumpWriter</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Microsoft.Diagnostics.Runtime\Microsoft.Diagnostics.Runtime.csproj">
-      <Project>{62b5098d-abea-4427-8a81-a2a5aa421789}</Project>
-      <Name>Microsoft.Diagnostics.Runtime</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

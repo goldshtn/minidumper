@@ -1,9 +1,5 @@
 ﻿using CommandLine;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MiniDumper
 {
@@ -11,9 +7,9 @@ namespace MiniDumper
     {
         [Option('m', HelpText =
             "Create a dump file, second paramer: \r\n" +
-            "m - a minidump  enough to diagnose crashes and display call stacks.\r\n" +
-            "h - a dump file with the CLR heap, but without module code or unmanaged memory contents\r\n" +
-            "a - a complete dump file with the full memory address space", Required = true)]
+            "    -mm minidump enough to diagnose crashes and display call stacks.\r\n" +
+            "    -mh dump file with the CLR heap, but without module code or unmanaged memory contents\r\n" +
+            "    -ma complete dump file with the full memory address space", Required = true)]
         public char DumpType { get; set; }
 
         [Option("async", HelpText =
@@ -33,10 +29,10 @@ namespace MiniDumper
         public bool Verbose { get; set; }
 
         [Option('f', HelpText = "Filter on the content of exceptions and debug logging. Wildcards (*) are supported.")]
-        public String ExceptionFilter { get; set; }
+        public string ExceptionFilter { get; set; }
 
         [Option('x', HelpText = "Launch the specified image with optional arguments.")]
-        public String DumpFolderForNewlyStartedProcess { get; set; }
+        public string DumpFolderForNewlyStartedProcess { get; set; }
 
         [Option('n', HelpText = "Number of dumps to write before exiting.", Default = 1)]
         public int NumberOfDumps { get; set; }
@@ -44,10 +40,10 @@ namespace MiniDumper
         [Option('t', HelpText = "Write a dump when the process terminates.")]
         public bool DumpOnProcessTerminate { get; set; }
 
-        [Value(0, Required = true)]
-        public String ProcessInfo { get; set; }
+        [Value(0, Required = true, HelpText = "PID or process name")]
+        public string ProcessInfo { get; set; }
 
-        [Value(0, Required = false)]
-        public IList<String> Args { get; set; }
+        [Value(0, Required = false, HelpText = "Arguments for the process to start")]
+        public IList<string> Args { get; set; }
     }
 }
