@@ -468,7 +468,7 @@ namespace DumpWriter
             uint ProcessId,
             IntPtr hFile,
             MINIDUMP_TYPE DumpType,
-            [In] ref MINIDUMP_EXCEPTION_INFORMATION ExceptionParam,
+            IntPtr errors,// [In] ref MINIDUMP_EXCEPTION_INFORMATION ExceptionParam,
             [In] ref MINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
             [In] ref MINIDUMP_CALLBACK_INFORMATION CallbackParam
             );

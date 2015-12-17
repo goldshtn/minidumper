@@ -154,7 +154,7 @@ namespace MiniDumper
             PrintTrace(string.Format("Dumping process memory to file: {0}", filename));
 
             Interlocked.Increment(ref numberOfDumpsTaken);
-            dumper.Dump(pid, dumpType, filename, writeAsync, dumpComment);
+            dumper.Dump(pid, hProcess, dumpType, filename, writeAsync, dumpComment);
         }
 
         String GetDumpFileName()

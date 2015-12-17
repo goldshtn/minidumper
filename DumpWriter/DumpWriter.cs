@@ -83,13 +83,16 @@ namespace DumpWriter
             {
                 foreach (var f in t.StackTrace)
                 {
-                    try { f.GetFileAndLineNumber(); }
+                    try { var ip = f.InstructionPointer; }
                     catch (Exception) { }
                 }
             }
 
             // Touch all modules
-            runtime.EnumerateModules().Count();
+            foreach (var m in runtime.Modules)
+            {
+                var addr = m.ImageBase;
+            }
 
             // Touch all heap regions, roots, types
             var heap = runtime.GetHeap();
@@ -333,20 +336,12 @@ namespace DumpWriter
             _logger = logger ?? TextWriter.Null;
         }
 
-        public void Dump(int pid, DumpType dumpType, string fileName, bool writeAsync = false, string dumpComment = null)
+        public void Dump(int pid, IntPtr hProcess, DumpType dumpType, string fileName, bool writeAsync = false, string dumpComment = null)
         {
             _pid = pid;
             _dumpType = dumpType;
             _spillSegmentsAsynchronously = writeAsync;
             dumpComment = dumpComment ?? ("DumpWriter: " + _dumpType.ToString());
-
-            IntPtr hProcess = DumpNativeMethods.OpenProcess(
-                ProcessAccessFlags.QueryInformation | ProcessAccessFlags.VirtualMemoryRead | ProcessAccessFlags.DuplicateHandle,
-                false,
-                (uint)_pid
-                );
-            if (hProcess == IntPtr.Zero)
-                throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", _pid, Marshal.GetLastWin32Error()));
 
             _dumpFileStream = new FileStream(fileName, FileMode.Create);
 
@@ -372,7 +367,7 @@ namespace DumpWriter
                 (uint)_pid,
                 _dumpFileStream.SafeFileHandle.DangerousGetHandle(),
                 nativeDumpType,
-                ref exceptionParam,
+                IntPtr.Zero, //ref exceptionParam,
                 ref userStreamParam,
                 ref callbackParam
                 );
@@ -392,7 +387,6 @@ namespace DumpWriter
             }
 
             userStreamParam.Delete();
-            DumpNativeMethods.CloseHandle(hProcess);
             _dumpFileStream.Close();
         }
 
