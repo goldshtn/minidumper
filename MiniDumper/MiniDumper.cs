@@ -99,8 +99,8 @@ namespace MiniDumper
             if (rgxFilter.IsMatch(exceptionInfo)) {
                 byte[] threadContext = new byte[Native.CONTEXT_SIZE];
                 target.DataReader.GetThreadContext(threadId, 0, Native.CONTEXT_SIZE, threadContext);
-                IntPtr pev = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(EXCEPTION_RECORD_GENERIC)));
-                Marshal.StructureToPtr(new EXCEPTION_RECORD_GENERIC {
+                IntPtr pev = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(EXCEPTION_RECORD)));
+                Marshal.StructureToPtr(new EXCEPTION_RECORD{
                     ExceptionAddress = ev.ExceptionAddress,
                     ExceptionFlags = ev.ExceptionFlags,
                     ExceptionCode = ev.ExceptionCode,

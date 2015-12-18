@@ -10,6 +10,7 @@ using VsChromium.Core.Win32.Debugging;
 using VsChromium.Core.Win32.Processes;
 using DebuggingNativeMethods = VsChromium.Core.Win32.Debugging.NativeMethods;
 using ProcessNativeMethods = VsChromium.Core.Win32.Processes.NativeMethods;
+using HandlesNativeMethods = VsChromium.Core.Win32.Handles.NativeMethods;
 
 namespace MiniDumper
 {
@@ -154,7 +155,6 @@ namespace MiniDumper
             int pid;
             if (int.TryParse(_options.ProcessInfo, out pid)) {
                 _pid = pid;
-                _hProcess = Process.GetProcessById(pid).Handle;
             } else {
                 // not numeric - let's try to find it by name
                 var procs = Process.GetProcesses();
@@ -162,7 +162,6 @@ namespace MiniDumper
                     try {
                         if (_options.ProcessInfo.Equals(proc.MainModule.ModuleName, StringComparison.OrdinalIgnoreCase)) {
                             _pid = proc.Id;
-                            _hProcess = proc.Handle;
                             _processName = proc.MainModule.ModuleName;
                             break;
                         }
@@ -172,11 +171,11 @@ namespace MiniDumper
                 }
             }
             if (_pid > 0) {
-                Debug.Assert(_hProcess != IntPtr.Zero);
                 // process found - let's attach to it
                 if (!DebuggingNativeMethods.DebugActiveProcess(_pid)) {
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 }
+                _hProcess = ProcessNativeMethods.OpenProcess(ProcessAccessFlags.All, false, _pid).DangerousGetHandle();
                 return;
             }
             if (spawnNew) {
@@ -263,6 +262,11 @@ namespace MiniDumper
 
             // Should never get here
             return DumpType.MinimalWithFullCLRHeap;
+        }
+
+        ~Debugger()
+        {
+            HandlesNativeMethods.CloseHandle(_hProcess);
         }
     }
 }
