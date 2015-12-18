@@ -371,7 +371,8 @@ namespace DumpWriter
                 ref callbackParam
                 );
             if (!success)
-                throw new ApplicationException(String.Format("Error writing dump, error {0:x8}", Marshal.GetLastWin32Error()));
+                throw new ApplicationException(string.Format("Error writing dump, error: {0}", Marshal.GetExceptionForHR(
+                    Marshal.GetHRForLastWin32Error())));
 
             _logger.WriteLine("Process was suspended for {0:N2}ms", sw.Elapsed.TotalMilliseconds);
 

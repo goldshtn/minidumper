@@ -33,6 +33,7 @@ namespace MiniDumper
         private readonly TextWriter _logger;
         private readonly string _dumpFolder;
         private bool _detached;
+        private bool _shouldDeatch;
         private int _pid;
         private IntPtr _hProcess;
         private string _processName;
@@ -56,9 +57,8 @@ namespace MiniDumper
             // setup Ctrl+C listener
             Console.CancelKeyPress += (o, ev) => {
                 Console.WriteLine("Ctrl + C received - detaching from a process");
-                DetachProcess();
                 ev.Cancel = true;
-                Environment.Exit(0); // FIXME should it be that way? 
+                _shouldDeatch = true; 
             };
             WaitForDebugEvents();
         }
@@ -68,13 +68,17 @@ namespace MiniDumper
             using (var miniDumper = CreateMiniDumper()) {
                 while (!_detached) {
                     var debugEvent = WaitForDebugEvent(1000);
+                    if (_shouldDeatch) {
+                        DetachProcess();
+                        return;
+                    }
                     if (debugEvent.HasValue) {
                         switch (debugEvent.Value.dwDebugEventCode) {
                             case DEBUG_EVENT_CODE.EXIT_PROCESS_DEBUG_EVENT:
                                 if (_options.DumpOnProcessTerminate) {
                                     miniDumper.DumpOnProcessExit(debugEvent.Value.ExitProcess.dwExitCode);
                                 }
-                                DetachProcess();
+                                _shouldDeatch = true;
                                 break;
                             case DEBUG_EVENT_CODE.EXCEPTION_DEBUG_EVENT:
                                 var exception = debugEvent.Value.Exception;
@@ -86,12 +90,15 @@ namespace MiniDumper
                             default:
                                 break;
                         }
-                        if (_detached) {
+                        if (!_shouldDeatch && miniDumper.NumberOfDumpsTaken >= _options.NumberOfDumps) {
+                            Console.WriteLine("Number of dumps exceeded the specified limit - detaching.");
+                            _shouldDeatch = true;
+                        }
+                        if (_shouldDeatch) {
+                            DetachProcess();
                             return;
                         }
-                        if (miniDumper.NumberOfDumpsTaken >= _options.NumberOfDumps) {
-                            Console.WriteLine("Number of dumps exceeded the specified limit - detaching.");
-                            DetachProcess();
+                        if (_detached) {
                             return;
                         }
                         var continueStatus = HandleDebugEvent(debugEvent.Value);
