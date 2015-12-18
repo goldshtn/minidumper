@@ -1,9 +1,13 @@
 ﻿using DumpWriter;
+using Microsoft.Diagnostics.Runtime;
 using System;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using VsChromium.Core.Win32.Debugging;
+using ProcessNativeMethods = VsChromium.Core.Win32.Processes.NativeMethods;
 
 namespace MiniDumper
 {
@@ -30,7 +34,7 @@ namespace MiniDumper
 #endif
     }
 
-    class MiniDumper
+    class MiniDumper : IDisposable
     {
         const uint CLRDBG_NOTIFICATION_EXCEPTION_CODE = 0x04242420;
         const uint BREAKPOINT_CODE = 0x80000003;
@@ -45,6 +49,7 @@ namespace MiniDumper
         private readonly DumpType dumpType;
         private readonly bool writeAsync;
         private readonly Regex rgxFilter;
+        private readonly DataTarget target;
         private int numberOfDumpsTaken;
 
         public MiniDumper(string dumpFolder, int pid, IntPtr hProcess, string processName,
@@ -59,9 +64,10 @@ namespace MiniDumper
             this.writeAsync = writeAsync;
             this.rgxFilter = new Regex((filter ?? "*").Replace("*", ".*").Replace('?', '.'),
                 RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            this.target = DataTarget.AttachToProcess(pid, 1000, AttachFlag.Passive);
         }
 
-        public void DumpOnException(EXCEPTION_RECORD ev)
+        public void DumpOnException(uint threadId, EXCEPTION_RECORD ev)
         {
             if (ev.ExceptionCode == BREAKPOINT_CODE) {
                 return;
@@ -76,12 +82,6 @@ namespace MiniDumper
                 return;
             }
             // print information about the exception (decode it)
-            /*
-            uint threadId;
-            int hr = ((IDebugSystemObjects)client).GetCurrentThreadSystemId(out threadId);
-            if (hr != 0) {
-                Marshal.ThrowExceptionForHR(hr);
-            }
             ClrException managedException = null;
             foreach (var clrver in target.ClrVersions) {
                 var runtime = clrver.CreateRuntime();
@@ -91,24 +91,15 @@ namespace MiniDumper
                     break;
                 }
             }
-            var exceptionInfo = String.Format("{0:X}.{1} (\"{2}\")", ev.ExceptionCode,
+            var exceptionInfo = string.Format("{0:X}.{1} (\"{2}\")", ev.ExceptionCode,
                 managedException != null ? managedException.Type.Name : "Native",
                 managedException != null ? managedException.Message : "N/A");
 
             PrintTrace("Exception: " + exceptionInfo);
 
-            var dumper = new DumpWriter.DumpWriter(target.DataReader, hProcess, pid, logger);
-            Debug.Assert(dumper != null);
-            Debug.Assert(rgxFilter != null);
-
             if (rgxFilter.IsMatch(exceptionInfo)) {
-            */
-                /* I leave the Exception context for the future
-                var pctx = Marshal.AllocHGlobal(Native.CONTEXT_SIZE);
-                hr = ((IDebugAdvanced)client).GetThreadContext(pctx, Native.CONTEXT_SIZE);
-                if (hr != 0) {
-                    Marshal.ThrowExceptionForHR(hr);
-                }
+                byte[] threadContext = new byte[Native.CONTEXT_SIZE];
+                target.DataReader.GetThreadContext(threadId, 0, Native.CONTEXT_SIZE, threadContext);
                 IntPtr pev = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(EXCEPTION_RECORD_GENERIC)));
                 Marshal.StructureToPtr(new EXCEPTION_RECORD_GENERIC {
                     ExceptionAddress = ev.ExceptionAddress,
@@ -120,7 +111,7 @@ namespace MiniDumper
                 }, pev, false);
                 var excpointers = new EXCEPTION_POINTERS {
                     ExceptionRecord = pev,
-                    ContextRecord = pctx
+                    ContextRecord = threadContext
                 };
                 IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(excpointers));
                 Marshal.StructureToPtr(excpointers, ptr, false);
@@ -128,24 +119,25 @@ namespace MiniDumper
                     ThreadId = threadId,
                     ClientPointers = false,
                     ExceptionPointers = ptr
-                }; */
-                MakeActualDump(null /* excinfo */);
+                };
+                var pexcinfo = Marshal.AllocHGlobal(Marshal.SizeOf(excinfo));
+                Marshal.StructureToPtr(excinfo, pexcinfo, false);
 
-                /*
+                MakeActualDump(pexcinfo);
+
                 Marshal.FreeHGlobal(pev);
-                Marshal.FreeHGlobal(pctx);
-                Marshal.FreeHGlobal(ptr);*/
-                /*
-            }*/
+                Marshal.FreeHGlobal(pexcinfo);
+                Marshal.FreeHGlobal(ptr);
+            }
         }
 
         public void DumpOnProcessExit(uint exitCode)
         {
             PrintTrace(string.Format("Process has terminated."));
-            MakeActualDump();
+            MakeActualDump(IntPtr.Zero);
         }
 
-        private void MakeActualDump(MINIDUMP_EXCEPTION_INFORMATION? excinfo = null)
+        private void MakeActualDump(IntPtr excinfo)
         {
             //var dumper = new DumpWriter.DumpWriter(hProcess, pid, logger);
             var dumper = new DumpWriter.DumpWriter(logger);
@@ -154,10 +146,10 @@ namespace MiniDumper
             PrintTrace(string.Format("Dumping process memory to file: {0}", filename));
 
             Interlocked.Increment(ref numberOfDumpsTaken);
-            dumper.Dump(pid, hProcess, dumpType, filename, writeAsync, dumpComment);
+            dumper.Dump(pid, hProcess, dumpType, excinfo, filename, writeAsync, dumpComment);
         }
 
-        String GetDumpFileName()
+        string GetDumpFileName()
         {
             var bfilename = Path.Combine(dumpFolder, string.Format("{0}_{1:yyMMdd_HHmmss}", processName, DateTime.Now));
             int cnt = 0;
@@ -181,6 +173,11 @@ namespace MiniDumper
         public int NumberOfDumpsTaken
         {
             get { return numberOfDumpsTaken; }
+        }
+
+        public void Dispose()
+        {
+            target.Dispose();
         }
     }
 }

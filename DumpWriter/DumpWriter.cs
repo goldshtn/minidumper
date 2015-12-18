@@ -336,7 +336,8 @@ namespace DumpWriter
             _logger = logger ?? TextWriter.Null;
         }
 
-        public void Dump(int pid, IntPtr hProcess, DumpType dumpType, string fileName, bool writeAsync = false, string dumpComment = null)
+        public void Dump(int pid, IntPtr hProcess, DumpType dumpType, IntPtr exceptionParam,
+            string fileName, bool writeAsync = false, string dumpComment = null)
         {
             _pid = pid;
             _dumpType = dumpType;
@@ -345,7 +346,6 @@ namespace DumpWriter
 
             _dumpFileStream = new FileStream(fileName, FileMode.Create);
 
-            var exceptionParam = new MINIDUMP_EXCEPTION_INFORMATION();
             var userStreamParam = PrepareUserStream(dumpComment);
             var callbackParam = new MINIDUMP_CALLBACK_INFORMATION();
             _needMemoryCallbacks = (
@@ -367,7 +367,7 @@ namespace DumpWriter
                 (uint)_pid,
                 _dumpFileStream.SafeFileHandle.DangerousGetHandle(),
                 nativeDumpType,
-                IntPtr.Zero, //ref exceptionParam,
+                exceptionParam,
                 ref userStreamParam,
                 ref callbackParam
                 );

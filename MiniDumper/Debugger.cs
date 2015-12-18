@@ -17,13 +17,16 @@ namespace MiniDumper
     {
         static void Main(string[] args)
         {
-            // FIXME uncomment
-//            try {
+            try {
                 var result = Parser.Default.ParseArguments<CommandLineOptions>(args);
                 result.WithParsed(options => new Debugger(options).TakeDumps());
-            //} catch (Exception ex) {
-            //    Console.Error.WriteLine("ERROR: {0}", ex.Message);
-            //}
+            } catch (Exception ex) {
+#if DEBUG
+                throw;
+#else
+                Console.Error.WriteLine("ERROR: {0}", ex.Message);
+#endif
+            }
         }
 
         private readonly CommandLineOptions _options;
@@ -62,39 +65,39 @@ namespace MiniDumper
 
         private void WaitForDebugEvents()
         {
-            var miniDumper = CreateMiniDumper();
-            while (!_detached)
-            {
-                var debugEvent = WaitForDebugEvent(1000);
-                if (debugEvent.HasValue) {
-                    switch (debugEvent.Value.dwDebugEventCode) {
-                        case DEBUG_EVENT_CODE.EXIT_PROCESS_DEBUG_EVENT:
-                            if (_options.DumpOnProcessTerminate) {
-                                miniDumper.DumpOnProcessExit(debugEvent.Value.ExitProcess.dwExitCode);
-                            }
+            using (var miniDumper = CreateMiniDumper()) {
+                while (!_detached) {
+                    var debugEvent = WaitForDebugEvent(1000);
+                    if (debugEvent.HasValue) {
+                        switch (debugEvent.Value.dwDebugEventCode) {
+                            case DEBUG_EVENT_CODE.EXIT_PROCESS_DEBUG_EVENT:
+                                if (_options.DumpOnProcessTerminate) {
+                                    miniDumper.DumpOnProcessExit(debugEvent.Value.ExitProcess.dwExitCode);
+                                }
+                                DetachProcess();
+                                break;
+                            case DEBUG_EVENT_CODE.EXCEPTION_DEBUG_EVENT:
+                                var exception = debugEvent.Value.Exception;
+                                if (_options.DumpOnException == 1 && exception.dwFirstChance == 1 ||
+                                    _options.DumpOnException == 2) {
+                                    miniDumper.DumpOnException((uint)debugEvent.Value.dwThreadId, exception.ExceptionRecord);
+                                }
+                                break;
+                            default:
+                                break;
+                        }
+                        if (_detached) {
+                            return;
+                        }
+                        if (miniDumper.NumberOfDumpsTaken >= _options.NumberOfDumps) {
                             DetachProcess();
-                            break;
-                        case DEBUG_EVENT_CODE.EXCEPTION_DEBUG_EVENT:
-                            var exception = debugEvent.Value.Exception;
-                            if (_options.DumpOnException == 1 && exception.dwFirstChance == 1 ||
-                                _options.DumpOnException == 2) {
-                                miniDumper.DumpOnException(exception.ExceptionRecord);
-                            } 
-                            break;
-                        default:
-                            break;
-                    }
-                    if (_detached) {
-                        return;
-                    }
-                    if (miniDumper.NumberOfDumpsTaken >= _options.NumberOfDumps) {
-                        DetachProcess();
-                        return;
-                    }
-                    var continueStatus = HandleDebugEvent(debugEvent.Value);
-                    if (!DebuggingNativeMethods.ContinueDebugEvent(debugEvent.Value.dwProcessId, 
-                        debugEvent.Value.dwThreadId, continueStatus)) {
-                        throw new LastWin32ErrorException("Error in ContinueDebugEvent");
+                            return;
+                        }
+                        var continueStatus = HandleDebugEvent(debugEvent.Value);
+                        if (!DebuggingNativeMethods.ContinueDebugEvent(debugEvent.Value.dwProcessId,
+                            debugEvent.Value.dwThreadId, continueStatus)) {
+                            throw new LastWin32ErrorException("Error in ContinueDebugEvent");
+                        }
                     }
                 }
             }
@@ -104,8 +107,7 @@ namespace MiniDumper
         {
             DEBUG_EVENT debugEvent;
             var success = DebuggingNativeMethods.WaitForDebugEvent(out debugEvent, timeout);
-            if (!success)
-            {
+            if (!success) {
                 int hr = Marshal.GetHRForLastWin32Error();
                 if (hr == HResults.HR_ERROR_SEM_TIMEOUT)
                     return null;
@@ -117,15 +119,15 @@ namespace MiniDumper
 
         private static CONTINUE_STATUS HandleDebugEvent(DEBUG_EVENT value)
         {
-            if (value.dwDebugEventCode == DEBUG_EVENT_CODE.EXCEPTION_DEBUG_EVENT)
+            if (value.dwDebugEventCode == DEBUG_EVENT_CODE.EXCEPTION_DEBUG_EVENT) {
                 return CONTINUE_STATUS.DBG_EXCEPTION_NOT_HANDLED;
-            else
-                return CONTINUE_STATUS.DBG_CONTINUE;
+            }
+            return CONTINUE_STATUS.DBG_CONTINUE;
         }
 
         static void ValidateOptions(CommandLineOptions options)
         {
-            if (String.IsNullOrEmpty(options.ProcessInfo)) {
+            if (string.IsNullOrEmpty(options.ProcessInfo)) {
                 throw new ArgumentException("Either a process id or process name is required");
             }
             // file name and dump folder
@@ -164,8 +166,7 @@ namespace MiniDumper
             if (_pid > 0) {
                 Debug.Assert(_hProcess != IntPtr.Zero);
                 // process found - let's attach to it
-                if (!DebuggingNativeMethods.DebugActiveProcess(_pid))
-                {
+                if (!DebuggingNativeMethods.DebugActiveProcess(_pid)) {
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 }
                 return;
@@ -179,13 +180,11 @@ namespace MiniDumper
                 bool res = ProcessNativeMethods.CreateProcess(null, new StringBuilder(commandLine),
                     null, null, false, ProcessCreationFlags.DEBUG_ONLY_THIS_PROCESS, IntPtr.Zero, null, 
                     startupInfo, processInformation);
-                if (!res)
-                {
+                if (!res) {
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 }
 
-                if (!DebuggingNativeMethods.DebugSetProcessKillOnExit(false))
-                {
+                if (!DebuggingNativeMethods.DebugSetProcessKillOnExit(false)) {
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 }
                 _pid = processInformation.dwProcessId;

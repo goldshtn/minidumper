@@ -36,7 +36,7 @@ namespace DumpWriter
     public struct EXCEPTION_POINTERS
     {
         public IntPtr ExceptionRecord;
-        public IntPtr ContextRecord;
+        public byte[] ContextRecord;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
@@ -468,7 +468,7 @@ namespace DumpWriter
             uint ProcessId,
             IntPtr hFile,
             MINIDUMP_TYPE DumpType,
-            IntPtr errors,// [In] ref MINIDUMP_EXCEPTION_INFORMATION ExceptionParam,
+            IntPtr ExceptionParams,
             [In] ref MINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
             [In] ref MINIDUMP_CALLBACK_INFORMATION CallbackParam
             );
