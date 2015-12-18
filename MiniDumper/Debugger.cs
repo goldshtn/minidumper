@@ -79,7 +79,7 @@ namespace MiniDumper
                             case DEBUG_EVENT_CODE.EXCEPTION_DEBUG_EVENT:
                                 var exception = debugEvent.Value.Exception;
                                 if (_options.DumpOnException == 1 && exception.dwFirstChance == 1 ||
-                                    _options.DumpOnException == 2) {
+                                    _options.DumpOnException == 2 && exception.dwFirstChance == 0) {
                                     miniDumper.DumpOnException((uint)debugEvent.Value.dwThreadId, exception.ExceptionRecord);
                                 }
                                 break;
@@ -90,6 +90,7 @@ namespace MiniDumper
                             return;
                         }
                         if (miniDumper.NumberOfDumpsTaken >= _options.NumberOfDumps) {
+                            Console.WriteLine("Number of dumps exceeded the specified limit - detaching.");
                             DetachProcess();
                             return;
                         }
@@ -177,8 +178,12 @@ namespace MiniDumper
 
                 var startupInfo = new STARTUPINFO();
                 var processInformation = new PROCESS_INFORMATION();
+                var processCreationFlags = ProcessCreationFlags.DEBUG_ONLY_THIS_PROCESS;
+                if (_options.StartProcessInNewConsoleWindow) {
+                    processCreationFlags |= ProcessCreationFlags.CREATE_NEW_CONSOLE;
+                }
                 bool res = ProcessNativeMethods.CreateProcess(null, new StringBuilder(commandLine),
-                    null, null, false, ProcessCreationFlags.DEBUG_ONLY_THIS_PROCESS, IntPtr.Zero, null, 
+                    null, null, false, processCreationFlags, IntPtr.Zero, null, 
                     startupInfo, processInformation);
                 if (!res) {
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
@@ -201,8 +206,10 @@ namespace MiniDumper
                 return;
             }
             if (!DebuggingNativeMethods.DebugActiveProcessStop(_pid)) {
-                Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
+                _logger.Write("Exception occured when detaching from the process: {0}",
+                    Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
             }
+            _detached = true;
         }
 
         void ShowBanner()

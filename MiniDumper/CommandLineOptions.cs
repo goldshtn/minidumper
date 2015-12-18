@@ -40,6 +40,9 @@ namespace MiniDumper
         [Option('t', HelpText = "Write a dump when the process terminates.")]
         public bool DumpOnProcessTerminate { get; set; }
 
+        [Option('c', HelpText = "Start the process in a new console window.")]
+        public bool StartProcessInNewConsoleWindow { get; set; }
+
         [Value(0, Required = true, HelpText = "PID or process name")]
         public string ProcessInfo { get; set; }
 

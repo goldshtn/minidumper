@@ -7,7 +7,6 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using VsChromium.Core.Win32.Debugging;
-using ProcessNativeMethods = VsChromium.Core.Win32.Processes.NativeMethods;
 
 namespace MiniDumper
 {
