@@ -88,10 +88,7 @@ namespace DumpWriter
             }
 
             // Touch all modules
-            foreach (var m in runtime.Modules)
-            {
-                var addr = m.ImageBase;
-            }
+            runtime.Modules.Count();
 
             // Touch all heap regions, roots, types
             var heap = runtime.GetHeap();

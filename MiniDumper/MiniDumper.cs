@@ -138,7 +138,6 @@ namespace MiniDumper
 
         private void MakeActualDump(IntPtr excinfo)
         {
-            //var dumper = new DumpWriter.DumpWriter(hProcess, pid, logger);
             var dumper = new DumpWriter.DumpWriter(logger);
 
             var filename = GetDumpFileName();
