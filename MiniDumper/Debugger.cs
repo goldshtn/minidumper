@@ -10,7 +10,6 @@ using VsChromium.Core.Win32.Debugging;
 using VsChromium.Core.Win32.Processes;
 using DebuggingNativeMethods = VsChromium.Core.Win32.Debugging.NativeMethods;
 using ProcessNativeMethods = VsChromium.Core.Win32.Processes.NativeMethods;
-using HandlesNativeMethods = VsChromium.Core.Win32.Handles.NativeMethods;
 
 namespace MiniDumper
 {
@@ -22,11 +21,7 @@ namespace MiniDumper
                 var result = Parser.Default.ParseArguments<CommandLineOptions>(args);
                 result.WithParsed(options => new Debugger(options).TakeDumps());
             } catch (Exception ex) {
-#if DEBUG
-                throw;
-#else
                 Console.Error.WriteLine("ERROR: {0}", ex.Message);
-#endif
             }
         }
 
@@ -36,7 +31,6 @@ namespace MiniDumper
         private bool _detached;
         private bool _shouldDeatch;
         private int _pid;
-        private IntPtr _hProcess;
         private string _processName;
 
         public Debugger(CommandLineOptions options)
@@ -149,7 +143,6 @@ namespace MiniDumper
         void CreateProcess()
         {
             bool spawnNew = !string.IsNullOrEmpty(_options.DumpFolderForNewlyStartedProcess);
-            _hProcess = IntPtr.Zero;
             _processName = null;
 
             int pid;
@@ -175,7 +168,6 @@ namespace MiniDumper
                 if (!DebuggingNativeMethods.DebugActiveProcess(_pid)) {
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 }
-                _hProcess = ProcessNativeMethods.OpenProcess(ProcessAccessFlags.All, false, _pid).DangerousGetHandle();
                 return;
             }
             if (spawnNew) {
@@ -199,11 +191,10 @@ namespace MiniDumper
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 }
                 _pid = processInformation.dwProcessId;
-                _hProcess = processInformation.hProcess;
                 _processName = GetProcessName(_pid);
                 return;
             }
-            throw new ArgumentException("Something is wrong with the arguments - I wasn't able to create a process.");
+            throw new ArgumentException("Something is wrong with the arguments - couldn't find or create a requested process.");
         }
 
         void DetachProcess()
@@ -242,7 +233,7 @@ namespace MiniDumper
 
         private MiniDumper CreateMiniDumper()
         {
-            return new MiniDumper(_dumpFolder, _pid, _hProcess, _processName, _logger,
+            return new MiniDumper(_dumpFolder, _pid, _processName, _logger,
                 OptionToDumpType(_options), _options.Async, _options.ExceptionFilter);
         }
 
@@ -262,11 +253,6 @@ namespace MiniDumper
 
             // Should never get here
             return DumpType.MinimalWithFullCLRHeap;
-        }
-
-        ~Debugger()
-        {
-            HandlesNativeMethods.CloseHandle(_hProcess);
         }
     }
 }

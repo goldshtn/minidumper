@@ -42,7 +42,6 @@ namespace MiniDumper
 
         private readonly string dumpFolder;
         private readonly int pid;
-        private readonly IntPtr hProcess;
         private readonly string processName;
         private readonly TextWriter logger;
         private readonly DumpType dumpType;
@@ -51,12 +50,11 @@ namespace MiniDumper
         private readonly DataTarget target;
         private int numberOfDumpsTaken;
 
-        public MiniDumper(string dumpFolder, int pid, IntPtr hProcess, string processName,
+        public MiniDumper(string dumpFolder, int pid, string processName,
             TextWriter logger, DumpType dumpType, bool writeAsync, string filter)
         {
             this.dumpFolder = dumpFolder;
             this.pid = pid;
-            this.hProcess = hProcess;
             this.processName = processName;
             this.logger = logger;
             this.dumpType = dumpType;
@@ -144,7 +142,7 @@ namespace MiniDumper
             PrintTrace(string.Format("Dumping process memory to file: {0}", filename));
 
             Interlocked.Increment(ref numberOfDumpsTaken);
-            dumper.Dump(pid, hProcess, dumpType, excinfo, filename, writeAsync, dumpComment);
+            dumper.Dump(pid, dumpType, excinfo, filename, writeAsync, dumpComment);
         }
 
         string GetDumpFileName()
