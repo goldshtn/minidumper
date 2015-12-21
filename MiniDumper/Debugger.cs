@@ -60,6 +60,12 @@ namespace MiniDumper
         private void WaitForDebugEvents()
         {
             using (var miniDumper = CreateMiniDumper()) {
+                if (_options.NoDumpOptionSelected) {
+                    miniDumper.DumpWithoutReason();
+                    DetachProcess();
+                    return;
+                }
+
                 while (!_detached) {
                     var debugEvent = WaitForDebugEvent(1000);
                     if (_shouldDeatch) {
@@ -136,6 +142,10 @@ namespace MiniDumper
             if (options.DumpFolderForNewlyStartedProcess != null &&
                 !Directory.Exists(options.DumpFolderForNewlyStartedProcess)) {
                 throw new ArgumentException("The specified dump folder does not exist.");
+            }
+            if (options.NoDumpOptionSelected && !string.IsNullOrEmpty(
+                options.DumpFolderForNewlyStartedProcess)) {
+                throw new ArgumentException("Option to create an immediate dump when starting a process is not supported.");
             }
         }
 

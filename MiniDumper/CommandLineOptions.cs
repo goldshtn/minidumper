@@ -48,5 +48,10 @@ namespace MiniDumper
 
         [Value(0, Required = false, HelpText = "Arguments for the process to start")]
         public IList<string> Args { get; set; }
+
+        public bool NoDumpOptionSelected
+        {
+            get { return !DumpOnProcessTerminate && DumpOnException == 0; }
+        }
     }
 }

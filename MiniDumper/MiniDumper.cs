@@ -64,6 +64,12 @@ namespace MiniDumper
             this.target = DataTarget.AttachToProcess(pid, 1000, AttachFlag.Passive);
         }
 
+        public void DumpWithoutReason()
+        {
+            PrintTrace("Taking a dump.");
+            MakeActualDump(IntPtr.Zero);
+        }
+
         public void DumpOnException(uint threadId, EXCEPTION_RECORD ev)
         {
             if (ev.ExceptionCode == BREAKPOINT_CODE) {
