@@ -17,6 +17,8 @@ Also included is a stand-alone library (DumpWriter) that can be added to any pro
 
 ### Usage
 
+The command line options resemble those from procdump (not all features are yet implemented) so if you are familiar with that tool you should find yourself easily in minidumper.
+
 ```
   -m              Required. Create a dump file, second paramer:
     -mm
@@ -57,3 +59,9 @@ Also included is a stand-alone library (DumpWriter) that can be added to any pro
 
   value pos. 0    Arguments for the process to start
 ```
+
+### Articles about minidumper
+
+- []()
+- []()
+- []()

@@ -44,7 +44,6 @@ namespace MiniDumper
 
         void TakeDumps()
         {
-            // FIXME gather information about the process, extract 64bit version and dbghelp library
             CreateProcess();
 
             ShowBanner();
