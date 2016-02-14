@@ -63,19 +63,19 @@ namespace DumpWriter
 
         #region Boring
 
-        public bool CanReadAsync
-        {
-            get
-            {
-                return _impl.CanReadAsync;
-            }
-        }
-
         public bool IsMinidump
         {
             get
             {
                 return _impl.IsMinidump;
+            }
+        }
+
+        public bool CanReadAsync
+        {
+            get
+            {
+                return _impl.CanReadAsync;
             }
         }
 
@@ -134,11 +134,6 @@ namespace DumpWriter
             return _impl.ReadDwordUnsafe(addr);
         }
 
-        public AsyncMemoryReadResult ReadMemoryAsync(ulong address, int bytesRequested)
-        {
-            return _impl.ReadMemoryAsync(address, bytesRequested);
-        }
-
         public ulong ReadPointerUnsafe(ulong addr)
         {
             return _impl.ReadPointerUnsafe(addr);
@@ -147,6 +142,11 @@ namespace DumpWriter
         public bool VirtualQuery(ulong addr, out VirtualQueryData vq)
         {
             return _impl.VirtualQuery(addr, out vq);
+        }
+
+        public AsyncMemoryReadResult ReadMemoryAsync(ulong address, int bytesRequested)
+        {
+            throw new NotImplementedException();
         }
 
         #endregion

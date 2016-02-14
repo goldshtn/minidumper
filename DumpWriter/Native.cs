@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DumpWriter
 {
@@ -37,7 +33,14 @@ namespace DumpWriter
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
-    struct MINIDUMP_EXCEPTION_INFORMATION
+    public struct EXCEPTION_POINTERS
+    {
+        public IntPtr ExceptionRecord;
+        public byte[] ContextRecord;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct MINIDUMP_EXCEPTION_INFORMATION
     {
         public uint ThreadId;
         public IntPtr ExceptionPointers;
@@ -127,11 +130,7 @@ namespace DumpWriter
     {
         public uint ThreadId;
         public IntPtr ThreadHandle;
-#if X64
-        public fixed byte Context[1232];
-#else
-        public fixed byte Context[716];
-#endif
+        public fixed byte Context[DumpNativeMethods.CONTEXT_SIZE];
         public uint SizeOfContext;
         public ulong StackBase;
         public ulong StackEnd;
@@ -456,6 +455,12 @@ namespace DumpWriter
 
     class DumpNativeMethods
     {
+#if X64
+        public const int CONTEXT_SIZE = 1232;
+#else
+        public const int CONTEXT_SIZE = 716;
+#endif
+
         [DllImport("dbghelp.dll", CallingConvention = CallingConvention.Winapi, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool MiniDumpWriteDump(
@@ -463,7 +468,7 @@ namespace DumpWriter
             uint ProcessId,
             IntPtr hFile,
             MINIDUMP_TYPE DumpType,
-            [In] ref MINIDUMP_EXCEPTION_INFORMATION ExceptionParam,
+            IntPtr ExceptionParams,
             [In] ref MINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
             [In] ref MINIDUMP_CALLBACK_INFORMATION CallbackParam
             );

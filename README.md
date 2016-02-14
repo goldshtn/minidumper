@@ -17,27 +17,51 @@ Also included is a stand-alone library (DumpWriter) that can be added to any pro
 
 ### Usage
 
+The command line options resemble those from procdump (not all features are yet implemented) so if you are familiar with that tool you should find yourself easily in minidumper.
+
 ```
-  --pid        The id of the process to dump.
+  -m              Required. Create a dump file, second paramer:
+    -mm
+                  minidump enough to diagnose crashes and display call
+                  stacks.
+    -mh dump file with the CLR heap, but without
+                  module code or unmanaged memory contents
+    -ma complete
+                  dump file with the full memory address space
 
-  --pn         The name of the process to dump.
+  --async         Write dump chunks to disk asynchronously. Reduces process
+                  suspension time at the expense of higher memory usage.
 
-  -f           Required. The name of the dump file to create.
+  -e              Write a dump when the process encounters an unhandled
+                  exception. Include the 1 to create dump on first chance
+                  exceptions, include the 2 to create dump on second chance
+                  exceptions.
 
-  --mini       Create a minimal dump file, enough to diagnose crashes and
-               display call stacks.
+  -l              Display the debug logging of the process + diagnostics info
+                  from the minidumper.
 
-  --heap       Create a dump file with the CLR heap, but without module code or
-               unmanaged memory contents.
+  -f              Filter on the content of exceptions and debug logging.
+                  Wildcards (*) are supported.
 
-  --full       Create a complete dump file with the full memory address space.
+  -x              Launch the specified image with optional arguments.
 
-  --async      Write dump chunks to disk asynchronously. Reduces process
-               suspension time at the expense of higher memory usage.
+  -n              (Default: 1) Number of dumps to write before exiting.
 
-  -v           Get detailed diagnostic output from the dump capturing process.
+  -t              Write a dump when the process terminates.
 
-  --help       Display this help screen.
+  -c              Start the process in a new console window.
 
-  --version    Display version information.
+  --help          Display this help screen.
+
+  --version       Display version information.
+
+  value pos. 0    Required. PID or process name
+
+  value pos. 0    Arguments for the process to start
 ```
+
+### Articles about minidumper
+
+- [Creating Smaller, But Still Usable, Dumps of .NET Applications](http://blogs.microsoft.co.il/sasha/2015/08/19/minidumper-smaller-dumps-net-applications/)
+- [More on MiniDumper: Getting the Right Memory Pages for .NET Analysis](http://blogs.microsoft.co.il/sasha/2015/09/30/more-on-minidumper-getting-the-right-memory-pages-for-net-analysis/)
+- [New features coming to minidumper](https://lowleveldesign.wordpress.com/2015/12/21/new-features-coming-to-minidumper)

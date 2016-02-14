@@ -6,7 +6,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace DumpWriter
@@ -59,7 +58,7 @@ namespace DumpWriter
 
             foreach (var clrVersion in target.ClrVersions)
             {
-                var runtime = target.CreateRuntime(clrVersion.TryDownloadDac());
+                var runtime = clrVersion.CreateRuntime();
 
                 AddCLRRegions(runtime);
 
@@ -83,13 +82,13 @@ namespace DumpWriter
             {
                 foreach (var f in t.StackTrace)
                 {
-                    try { f.GetFileAndLineNumber(); }
+                    try { var ip = f.InstructionPointer; }
                     catch (Exception) { }
                 }
             }
 
             // Touch all modules
-            runtime.EnumerateModules().Count();
+            runtime.Modules.Count();
 
             // Touch all heap regions, roots, types
             var heap = runtime.GetHeap();
@@ -333,7 +332,8 @@ namespace DumpWriter
             _logger = logger ?? TextWriter.Null;
         }
 
-        public void Dump(int pid, DumpType dumpType, string fileName, bool writeAsync = false, string dumpComment = null)
+        public void Dump(int pid, DumpType dumpType, IntPtr exceptionParam,
+            string fileName, bool writeAsync = false, string dumpComment = null)
         {
             _pid = pid;
             _dumpType = dumpType;
@@ -347,10 +347,10 @@ namespace DumpWriter
                 );
             if (hProcess == IntPtr.Zero)
                 throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", _pid, Marshal.GetLastWin32Error()));
+ 
 
             _dumpFileStream = new FileStream(fileName, FileMode.Create);
 
-            var exceptionParam = new MINIDUMP_EXCEPTION_INFORMATION();
             var userStreamParam = PrepareUserStream(dumpComment);
             var callbackParam = new MINIDUMP_CALLBACK_INFORMATION();
             _needMemoryCallbacks = (
@@ -372,12 +372,12 @@ namespace DumpWriter
                 (uint)_pid,
                 _dumpFileStream.SafeFileHandle.DangerousGetHandle(),
                 nativeDumpType,
-                ref exceptionParam,
+                exceptionParam,
                 ref userStreamParam,
-                ref callbackParam
-                );
+                ref callbackParam);
             if (!success)
-                throw new ApplicationException(String.Format("Error writing dump, error {0:x8}", Marshal.GetLastWin32Error()));
+                throw new ApplicationException(string.Format("Error writing dump, error: {0}", Marshal.GetExceptionForHR(
+                    Marshal.GetHRForLastWin32Error())));
 
             _logger.WriteLine("Process was suspended for {0:N2}ms", sw.Elapsed.TotalMilliseconds);
 
