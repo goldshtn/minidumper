@@ -164,7 +164,6 @@ namespace MiniDumper
                     try {
                         if (_options.ProcessInfo.Equals(proc.MainModule.ModuleName, StringComparison.OrdinalIgnoreCase)) {
                             _pid = proc.Id;
-                            _processName = proc.MainModule.ModuleName;
                             break;
                         }
                     } catch {
@@ -177,6 +176,7 @@ namespace MiniDumper
                 if (!DebuggingNativeMethods.DebugActiveProcess(_pid)) {
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 }
+                _processName = GetProcessName(_pid);
                 return;
             }
             if (spawnNew) {
