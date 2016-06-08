@@ -38,8 +38,7 @@ namespace MiniDumper
             ValidateOptions(options);
             _options = options;
             _logger = options.Verbose ? Console.Out : TextWriter.Null;
-            _dumpFolder = options.DumpFolderForNewlyStartedProcess ?? Path.GetDirectoryName(
-                Process.GetCurrentProcess().MainModule.FileName);
+            _dumpFolder = options.DumpFolderForNewlyStartedProcess ?? Directory.GetCurrentDirectory();
         }
 
         void TakeDumps()
