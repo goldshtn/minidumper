@@ -62,6 +62,7 @@ The command line options resemble those from procdump (not all features are yet 
 
 ### Articles about minidumper
 
+- [Minidumper - a better way to create managed memory dumps](http://www.codeproject.com/Articles/1102423/Minidumper-a-better-way-to-create-managed-memory-d)
 - [Creating Smaller, But Still Usable, Dumps of .NET Applications](http://blogs.microsoft.co.il/sasha/2015/08/19/minidumper-smaller-dumps-net-applications/)
 - [More on MiniDumper: Getting the Right Memory Pages for .NET Analysis](http://blogs.microsoft.co.il/sasha/2015/09/30/more-on-minidumper-getting-the-right-memory-pages-for-net-analysis/)
 - [New features coming to minidumper](https://lowleveldesign.wordpress.com/2015/12/21/new-features-coming-to-minidumper)
