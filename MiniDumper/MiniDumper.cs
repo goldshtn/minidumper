@@ -75,6 +75,7 @@ namespace MiniDumper
 
         public void DumpOnException(uint threadId, EXCEPTION_RECORD ev)
         {
+            if (ev.ExceptionCode == BREAKPOINT_CODE)
             {
                 return;
             }
