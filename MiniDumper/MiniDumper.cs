@@ -154,24 +154,26 @@ namespace MiniDumper
 
         public void PrintDebugString(OUTPUT_DEBUG_STRING_INFO outputDbgStrInfo)
         {
-            SafeProcessHandle hProcess = Process.OpenProcess(ProcessAccessFlags.VmRead, false, pid);
-            if (hProcess.IsInvalid)
-                throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
-
-            var dbgString = new byte[outputDbgStrInfo.nDebugStringLength];
-
-            uint numberOfBytesRead;
-            Process.ReadProcessMemory(hProcess, outputDbgStrInfo.lpDebugStringData, dbgString, outputDbgStrInfo.nDebugStringLength, out numberOfBytesRead);
-
-            if (numberOfBytesRead > 0)
+            using (SafeProcessHandle hProcess = Process.OpenProcess(ProcessAccessFlags.VmRead, false, pid))
             {
-                if (outputDbgStrInfo.fUnicode == 0)
+                if (hProcess.IsInvalid)
+                    throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
+
+                var dbgString = new byte[outputDbgStrInfo.nDebugStringLength];
+
+                uint numberOfBytesRead;
+                var result = Process.ReadProcessMemory(hProcess, outputDbgStrInfo.lpDebugStringData, dbgString, outputDbgStrInfo.nDebugStringLength, out numberOfBytesRead);
+
+                if (result)
                 {
-                    Console.WriteLine("Debug String:\n {0}", Encoding.ASCII.GetString(dbgString));
-                }
-                else
-                {
-                    Console.WriteLine("Debug String:\n {0}", Encoding.Unicode.GetString(dbgString));
+                    if (outputDbgStrInfo.fUnicode == 0)
+                    {
+                        Console.WriteLine("Debug String: {0}", Encoding.ASCII.GetString(dbgString));
+                    }
+                    else
+                    {
+                        Console.WriteLine("Debug String: {0}", Encoding.Unicode.GetString(dbgString));
+                    }
                 }
             }
         }
