@@ -86,6 +86,12 @@ namespace MiniDumper
                                     miniDumper.DumpOnException((uint)debugEvent.Value.dwThreadId, exception.ExceptionRecord);
                                 }
                                 break;
+                            case DEBUG_EVENT_CODE.OUTPUT_DEBUG_STRING_EVENT:
+                                if (_options.Verbose)
+                                {
+                                    miniDumper.PrintDebugString(debugEvent.Value.DebugString);
+                                }
+                                break;
                             default:
                                 break;
                         }
