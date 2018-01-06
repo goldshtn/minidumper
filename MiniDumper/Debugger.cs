@@ -226,7 +226,7 @@ namespace MiniDumper
         void ShowBanner()
         {
             Console.WriteLine("MiniDumper - writes .NET process dump files");
-            Console.WriteLine("Copyright (C) 2015 Sasha Goldstein (@goldshtn)");
+            Console.WriteLine("Copyright (C) 2018 Sasha Goldstein (@goldshtn)");
             Console.WriteLine();
             Console.WriteLine("With contributions from Sebastian Solnica (@lowleveldesign)");
             Console.WriteLine();

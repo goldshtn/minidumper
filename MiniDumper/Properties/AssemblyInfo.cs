@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("MiniDumper")]
-[assembly: AssemblyCopyright("Copyright © Sasha Goldshtein, Sebastian Solnica 2015")]
+[assembly: AssemblyCopyright("Copyright (C) 2018 Sasha Goldshtein, Sebastian Solnica")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
