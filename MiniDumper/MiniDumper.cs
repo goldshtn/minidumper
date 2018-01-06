@@ -4,9 +4,12 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using VsChromium.Core.Win32.Debugging;
+using VsChromium.Core.Win32.Processes;
+using Process = VsChromium.Core.Win32.Processes.NativeMethods;
 
 namespace MiniDumper
 {
@@ -72,24 +75,29 @@ namespace MiniDumper
 
         public void DumpOnException(uint threadId, EXCEPTION_RECORD ev)
         {
-            if (ev.ExceptionCode == BREAKPOINT_CODE) {
+            if (ev.ExceptionCode == BREAKPOINT_CODE)
+            {
                 return;
             }
-            if (ev.ExceptionCode == CLRDBG_NOTIFICATION_EXCEPTION_CODE) {
+            if (ev.ExceptionCode == CLRDBG_NOTIFICATION_EXCEPTION_CODE)
+            {
                 // based on https://social.msdn.microsoft.com/Forums/vstudio/en-US/bca092d4-d2b5-49ef-8bbc-cbce2c67aa89/net-40-firstchance-exception-0x04242420?forum=clr
                 // it's a "notification exception" and can be safely ignored
                 return;
             }
-            if (ev.ExceptionCode == CTRL_C_EXCEPTION_CODE) {
+            if (ev.ExceptionCode == CTRL_C_EXCEPTION_CODE)
+            {
                 // we will also ignore CTRL+C events
                 return;
             }
             // print information about the exception (decode it)
             ClrException managedException = null;
-            foreach (var clrver in target.ClrVersions) {
+            foreach (var clrver in target.ClrVersions)
+            {
                 var runtime = clrver.CreateRuntime();
                 var thr = runtime.Threads.FirstOrDefault(t => t.OSThreadId == threadId);
-                if (thr != null) {
+                if (thr != null)
+                {
                     managedException = thr.CurrentException;
                     break;
                 }
@@ -100,11 +108,13 @@ namespace MiniDumper
 
             PrintTrace("Exception: " + exceptionInfo);
 
-            if (rgxFilter.IsMatch(exceptionInfo)) {
+            if (rgxFilter.IsMatch(exceptionInfo))
+            {
                 byte[] threadContext = new byte[Native.CONTEXT_SIZE];
                 target.DataReader.GetThreadContext(threadId, 0, Native.CONTEXT_SIZE, threadContext);
                 IntPtr pev = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(EXCEPTION_RECORD)));
-                Marshal.StructureToPtr(new EXCEPTION_RECORD{
+                Marshal.StructureToPtr(new EXCEPTION_RECORD
+                {
                     ExceptionAddress = ev.ExceptionAddress,
                     ExceptionFlags = ev.ExceptionFlags,
                     ExceptionCode = ev.ExceptionCode,
@@ -112,13 +122,15 @@ namespace MiniDumper
                     NumberParameters = ev.NumberParameters,
                     ExceptionInformation = ev.ExceptionInformation
                 }, pev, false);
-                var excpointers = new EXCEPTION_POINTERS {
+                var excpointers = new EXCEPTION_POINTERS
+                {
                     ExceptionRecord = pev,
                     ContextRecord = threadContext
                 };
                 IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(excpointers));
                 Marshal.StructureToPtr(excpointers, ptr, false);
-                var excinfo = new MINIDUMP_EXCEPTION_INFORMATION() {
+                var excinfo = new MINIDUMP_EXCEPTION_INFORMATION()
+                {
                     ThreadId = threadId,
                     ClientPointers = false,
                     ExceptionPointers = ptr
@@ -140,6 +152,32 @@ namespace MiniDumper
             MakeActualDump(IntPtr.Zero);
         }
 
+        public void PrintDebugString(OUTPUT_DEBUG_STRING_INFO outputDbgStrInfo)
+        {
+            using (SafeProcessHandle hProcess = Process.OpenProcess(ProcessAccessFlags.VmRead, false, pid))
+            {
+                if (hProcess.IsInvalid)
+                    throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
+
+                var dbgString = new byte[outputDbgStrInfo.nDebugStringLength];
+
+                uint numberOfBytesRead;
+                var result = Process.ReadProcessMemory(hProcess, outputDbgStrInfo.lpDebugStringData, dbgString, outputDbgStrInfo.nDebugStringLength, out numberOfBytesRead);
+
+                if (result)
+                {
+                    if (outputDbgStrInfo.fUnicode == 0)
+                    {
+                        Console.WriteLine("Debug String: {0}", Encoding.ASCII.GetString(dbgString));
+                    }
+                    else
+                    {
+                        Console.WriteLine("Debug String: {0}", Encoding.Unicode.GetString(dbgString));
+                    }
+                }
+            }
+        }
+
         private void MakeActualDump(IntPtr excinfo)
         {
             var dumper = new DumpWriter.DumpWriter(logger);
@@ -157,8 +195,10 @@ namespace MiniDumper
             int cnt = 0;
 
             var filename = bfilename;
-            while (true) {
-                if (!File.Exists(filename + ".dmp")) {
+            while (true)
+            {
+                if (!File.Exists(filename + ".dmp"))
+                {
                     break;
                 }
                 cnt++;

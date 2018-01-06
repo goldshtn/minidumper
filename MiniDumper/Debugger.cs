@@ -38,8 +38,7 @@ namespace MiniDumper
             ValidateOptions(options);
             _options = options;
             _logger = options.Verbose ? Console.Out : TextWriter.Null;
-            _dumpFolder = options.DumpFolderForNewlyStartedProcess ?? Path.GetDirectoryName(
-                Process.GetCurrentProcess().MainModule.FileName);
+            _dumpFolder = options.DumpFolderForNewlyStartedProcess ?? Directory.GetCurrentDirectory();
         }
 
         void TakeDumps()
@@ -85,6 +84,12 @@ namespace MiniDumper
                                 if (_options.DumpOnException == 1 && exception.dwFirstChance == 1 ||
                                     _options.DumpOnException == 2 && exception.dwFirstChance == 0) {
                                     miniDumper.DumpOnException((uint)debugEvent.Value.dwThreadId, exception.ExceptionRecord);
+                                }
+                                break;
+                            case DEBUG_EVENT_CODE.OUTPUT_DEBUG_STRING_EVENT:
+                                if (_options.Verbose)
+                                {
+                                    miniDumper.PrintDebugString(debugEvent.Value.DebugString);
                                 }
                                 break;
                             default:
@@ -221,7 +226,7 @@ namespace MiniDumper
         void ShowBanner()
         {
             Console.WriteLine("MiniDumper - writes .NET process dump files");
-            Console.WriteLine("Copyright (C) 2015 Sasha Goldstein (@goldshtn)");
+            Console.WriteLine("Copyright (C) 2018 Sasha Goldstein (@goldshtn)");
             Console.WriteLine();
             Console.WriteLine("With contributions from Sebastian Solnica (@lowleveldesign)");
             Console.WriteLine();
