@@ -178,11 +178,6 @@ namespace MiniDumper
             }
         }
 
-        public void MemoryCommitThreshold()
-        {
-
-        }
-
         private void MakeActualDump(IntPtr excinfo)
         {
             var dumper = new DumpWriter.DumpWriter(logger);
