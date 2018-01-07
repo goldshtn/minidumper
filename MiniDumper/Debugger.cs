@@ -65,6 +65,8 @@ namespace MiniDumper
                     return;
                 }
 
+
+
                 while (!_detached) {
                     var debugEvent = WaitForDebugEvent(1000);
                     if (_shouldDeatch) {

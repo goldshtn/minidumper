@@ -43,6 +43,9 @@ namespace MiniDumper
         [Option('c', HelpText = "Start the process in a new console window.")]
         public bool StartProcessInNewConsoleWindow { get; set; }
 
+        [Option('m', HelpText = "Memory commit threshold in MB at which to create a dump.")]
+        public int MemoryCommitThreshold { get; set; }
+
         [Value(0, Required = true, HelpText = "PID or process name")]
         public string ProcessInfo { get; set; }
 
