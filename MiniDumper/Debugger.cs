@@ -65,6 +65,11 @@ namespace MiniDumper
                     return;
                 }
 
+                if (_options.MemoryCommitThreshold.HasValue)
+                {
+                    miniDumper.MemoryCommitThreshold(_options.MemoryCommitThreshold.Value);
+                }
+
                 while (!_detached) {
                     var debugEvent = WaitForDebugEvent(1000);
                     if (_shouldDeatch) {

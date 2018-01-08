@@ -1,15 +1,17 @@
 ﻿using DumpWriter;
 using Microsoft.Diagnostics.Runtime;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Timers;
 using VsChromium.Core.Win32.Debugging;
 using VsChromium.Core.Win32.Processes;
-using Process = VsChromium.Core.Win32.Processes.NativeMethods;
+using ProcessNativeMethod = VsChromium.Core.Win32.Processes.NativeMethods;
 
 namespace MiniDumper
 {
@@ -154,7 +156,7 @@ namespace MiniDumper
 
         public void PrintDebugString(OUTPUT_DEBUG_STRING_INFO outputDbgStrInfo)
         {
-            using (SafeProcessHandle hProcess = Process.OpenProcess(ProcessAccessFlags.VmRead, false, pid))
+            using (SafeProcessHandle hProcess = ProcessNativeMethod.OpenProcess(ProcessAccessFlags.VmRead, false, pid))
             {
                 if (hProcess.IsInvalid)
                     throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
@@ -162,7 +164,7 @@ namespace MiniDumper
                 var dbgString = new byte[outputDbgStrInfo.nDebugStringLength];
 
                 uint numberOfBytesRead;
-                var result = Process.ReadProcessMemory(hProcess, outputDbgStrInfo.lpDebugStringData, dbgString, outputDbgStrInfo.nDebugStringLength, out numberOfBytesRead);
+                var result = ProcessNativeMethod.ReadProcessMemory(hProcess, outputDbgStrInfo.lpDebugStringData, dbgString, outputDbgStrInfo.nDebugStringLength, out numberOfBytesRead);
 
                 if (result)
                 {
@@ -178,6 +180,32 @@ namespace MiniDumper
             }
         }
 
+        public void MemoryCommitThreshold(int commitThreshold)
+        {
+            Debug.Assert(commitThreshold != 0, "commitThreshold is zero");
+            System.Timers.Timer aTimer = new System.Timers.Timer();
+            aTimer.Interval = 1000;
+            aTimer.Elapsed += (sender, e) => OnTimedEvent(sender, e, commitThreshold); ;
+            aTimer.AutoReset = true;
+            aTimer.Enabled = true;
+
+        }
+
+        private void OnTimedEvent(Object source, ElapsedEventArgs e, int commitThreshold)
+        {
+           var process = Process.GetProcessById(pid);
+            double privateMemory = (process.PrivateMemorySize64 / 1024) / 1024;
+            Console.WriteLine($"PrivateMemory {(int)privateMemory}MB");
+
+            if (privateMemory >= commitThreshold)
+            {
+                var timer = source as System.Timers.Timer;
+                timer.Stop();
+                timer.Dispose();
+                PrintTrace($"Commit:\t{(int)privateMemory}MB");
+                MakeActualDump(IntPtr.Zero);
+            }
+        }
         private void MakeActualDump(IntPtr excinfo)
         {
             var dumper = new DumpWriter.DumpWriter(logger);
