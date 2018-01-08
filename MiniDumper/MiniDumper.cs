@@ -182,21 +182,17 @@ namespace MiniDumper
 
         public void MemoryCommitThreshold(int commitThreshold)
         {
-            Debug.Assert(commitThreshold != 0, "commitThreshold is zero");
             System.Timers.Timer aTimer = new System.Timers.Timer();
             aTimer.Interval = 1000;
             aTimer.Elapsed += (sender, e) => OnTimedEvent(sender, e, commitThreshold); ;
             aTimer.AutoReset = true;
             aTimer.Enabled = true;
-
         }
 
         private void OnTimedEvent(Object source, ElapsedEventArgs e, int commitThreshold)
         {
            var process = Process.GetProcessById(pid);
             double privateMemory = (process.PrivateMemorySize64 / 1024) / 1024;
-            Console.WriteLine($"PrivateMemory {(int)privateMemory}MB");
-
             if (privateMemory >= commitThreshold)
             {
                 var timer = source as System.Timers.Timer;
