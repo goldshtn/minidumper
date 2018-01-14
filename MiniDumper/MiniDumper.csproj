@@ -110,6 +110,7 @@
     <Compile Include="Win32\Processes\NativeStructs.cs" />
     <Compile Include="Win32\Processes\ProcessCreationFlags.cs" />
     <Compile Include="Win32\Processes\PROCESS_INFORMATION.cs" />
+    <Compile Include="Win32\Processes\PROCESS_MEMORY_COUNTERS_EX.cs" />
     <Compile Include="Win32\Processes\SafeProcessHandle.cs" />
     <Compile Include="Win32\Processes\SafeThreadHandle.cs" />
     <Compile Include="Win32\Processes\Startupinfo.cs" />

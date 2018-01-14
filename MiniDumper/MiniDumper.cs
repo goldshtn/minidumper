@@ -1,5 +1,6 @@
 ﻿using DumpWriter;
 using Microsoft.Diagnostics.Runtime;
+using MiniDumper.Win32.Processes;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -54,6 +55,7 @@ namespace MiniDumper
         private readonly Regex rgxFilter;
         private readonly DataTarget target;
         private int numberOfDumpsTaken;
+        System.Timers.Timer pollingTimer;
 
         public MiniDumper(string dumpFolder, int pid, string processName,
             TextWriter logger, DumpType dumpType, bool writeAsync, string filter)
@@ -67,6 +69,8 @@ namespace MiniDumper
             this.rgxFilter = new Regex((filter ?? "*").Replace("*", ".*").Replace('?', '.'),
                 RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
             this.target = DataTarget.AttachToProcess(pid, 1000, AttachFlag.Passive);
+
+            pollingTimer = new System.Timers.Timer();
         }
 
         public void DumpWithoutReason()
@@ -180,28 +184,47 @@ namespace MiniDumper
             }
         }
 
-        public void MemoryCommitThreshold(int commitThreshold)
+        public void MemoryCommitThreshold(uint commitThreshold)
         {
-            System.Timers.Timer aTimer = new System.Timers.Timer();
-            aTimer.Interval = 1000;
-            aTimer.Elapsed += (sender, e) => OnTimedEvent(sender, e, commitThreshold); ;
-            aTimer.AutoReset = true;
-            aTimer.Enabled = true;
+            SafeProcessHandle hProcess = ProcessNativeMethod.OpenProcess(ProcessAccessFlags.QueryInformation, false, pid);
+            Debug.Assert(!hProcess.IsInvalid);
+            if (hProcess.IsInvalid)
+                throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
+
+            pollingTimer.Interval = 1000;
+            pollingTimer.Elapsed += (sender, e) => OnTimedEvent(sender, e, commitThreshold, hProcess); ;
+            pollingTimer.AutoReset = true;
+            pollingTimer.Enabled = true;
         }
 
-        private void OnTimedEvent(Object source, ElapsedEventArgs e, int commitThreshold)
+        private void OnTimedEvent(Object source, ElapsedEventArgs e, uint commitThreshold, SafeProcessHandle hProcess)
         {
-           var process = Process.GetProcessById(pid);
-            double privateMemory = (process.PrivateMemorySize64 / 1024) / 1024;
-            if (privateMemory >= commitThreshold)
+            var commitThresholdinBytes = commitThreshold * 1024 * 1024;
+            var processCommit = GetProcessCommit(hProcess);
+            if (processCommit >= commitThresholdinBytes)
             {
                 var timer = source as System.Timers.Timer;
-                timer.Stop();
-                timer.Dispose();
-                PrintTrace($"Commit:\t{(int)privateMemory}MB");
+                pollingTimer.Stop();
+                hProcess.Dispose();
+                PrintTrace($"Commit:\t >= {commitThresholdinBytes}MB");
                 MakeActualDump(IntPtr.Zero);
             }
         }
+
+        private UInt32 GetProcessCommit(SafeProcessHandle hProcess)
+        {
+            var process = Process.GetProcessById(pid);
+            PROCESS_MEMORY_COUNTERS_EX counters;
+            var result = ProcessNativeMethod.GetProcessMemoryInfo(hProcess, out counters, (uint)Marshal.SizeOf<PROCESS_MEMORY_COUNTERS_EX>());
+            Debug.Assert(result);
+            if (!result)
+            {
+                pollingTimer.Stop();
+                Console.WriteLine(String.Format("Unable to query process memory info {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
+            }
+            return counters.PrivateUsage.ToUInt32();
+        }
+
         private void MakeActualDump(IntPtr excinfo)
         {
             var dumper = new DumpWriter.DumpWriter(logger);
@@ -244,6 +267,7 @@ namespace MiniDumper
         public void Dispose()
         {
             target.Dispose();
+            pollingTimer.Dispose();
         }
     }
 }

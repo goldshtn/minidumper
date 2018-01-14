@@ -29,7 +29,7 @@ namespace MiniDumper
         public bool Verbose { get; set; }
 
         [Option('p', HelpText = "Memory commit threshold in MB at which to create a dump.")]
-        public int? MemoryCommitThreshold { get; set; }
+        public uint? MemoryCommitThreshold { get; set; }
 
         [Option('f', HelpText = "Filter on the content of exceptions and debug logging. Wildcards (*) are supported.")]
         public string ExceptionFilter { get; set; }
