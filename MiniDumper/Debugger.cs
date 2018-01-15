@@ -65,9 +65,9 @@ namespace MiniDumper
                     return;
                 }
 
-                if (_options.MemoryCommitThreshold.HasValue)
+                if (_options.MemoryCommitThreshold.HasValue || _options.MemoryCommitDrops.HasValue)
                 {
-                    miniDumper.MemoryCommitThreshold(_options.MemoryCommitThreshold.Value);
+                    miniDumper.MemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops);
                 }
 
                 while (!_detached) {

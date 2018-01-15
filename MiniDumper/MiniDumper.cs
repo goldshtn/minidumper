@@ -184,7 +184,7 @@ namespace MiniDumper
             }
         }
 
-        public void MemoryCommitThreshold(uint commitThreshold)
+        public void MemoryCommitThreshold(uint? commitThreshold, uint? commitDrops)
         {
             SafeProcessHandle hProcess = ProcessNativeMethod.OpenProcess(ProcessAccessFlags.QueryInformation, false, pid);
             Debug.Assert(!hProcess.IsInvalid);
@@ -192,23 +192,27 @@ namespace MiniDumper
                 throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
 
             pollingTimer.Interval = 1000;
-            pollingTimer.Elapsed += (sender, e) => OnTimedEvent(sender, e, commitThreshold, hProcess); ;
+            pollingTimer.Elapsed += (sender, e) => OnTimedEvent(sender, e, commitThreshold, commitDrops, hProcess); ;
             pollingTimer.AutoReset = true;
             pollingTimer.Enabled = true;
         }
 
-        private void OnTimedEvent(Object source, ElapsedEventArgs e, uint commitThreshold, SafeProcessHandle hProcess)
+        private void OnTimedEvent(Object source, ElapsedEventArgs e, uint? commitThreshold, uint? commitDrops,SafeProcessHandle hProcess)
         {
             var commitThresholdinBytes = commitThreshold * 1024 * 1024;
+            var commitDropsinBytes = commitDrops * 1024 * 1024;
+
             var processCommit = GetProcessCommit(hProcess);
-            if (processCommit >= commitThresholdinBytes)
+            if ((commitThresholdinBytes.HasValue && processCommit >= commitThresholdinBytes) || (commitDropsinBytes.HasValue && processCommit >= commitDropsinBytes))
             {
                 var timer = source as System.Timers.Timer;
                 pollingTimer.Stop();
                 hProcess.Dispose();
-                PrintTrace($"Commit:\t >= {commitThresholdinBytes}MB");
-                MakeActualDump(IntPtr.Zero);
+                Debug.Write(commitThresholdinBytes.HasValue ?$"Commit:\t >= {commitThreshold}MB": $"Commit:\t <= {commitDrops}MB");
+               // goto takeDump;
             }
+            //takeDump:
+            //MakeActualDump(IntPtr.Zero);
         }
 
         private UInt32 GetProcessCommit(SafeProcessHandle hProcess)
