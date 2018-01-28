@@ -57,7 +57,7 @@ namespace MiniDumper
 
         public bool NoDumpOptionSelected
         {
-            get { return !DumpOnProcessTerminate && DumpOnException == 0; }
+            get { return !DumpOnProcessTerminate && DumpOnException == 0 && !(MemoryCommitThreshold.HasValue || MemoryCommitDrops.HasValue); }
         }
     }
 }
