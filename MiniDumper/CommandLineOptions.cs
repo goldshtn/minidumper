@@ -59,5 +59,10 @@ namespace MiniDumper
         {
             get { return !DumpOnProcessTerminate && DumpOnException == 0 && !(MemoryCommitThreshold.HasValue || MemoryCommitDrops.HasValue); }
         }
+
+        public bool NeedAttachDebugger
+        {
+            get { return DumpOnProcessTerminate || DumpOnException == 0; }
+        }
     }
 }

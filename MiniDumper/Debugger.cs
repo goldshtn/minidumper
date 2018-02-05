@@ -71,23 +71,28 @@ namespace MiniDumper
                 {
                     miniDumper.DumpWithoutReason();
                     DetachProcess();
-                    CheckNumberOfDumpsTaken(miniDumper);
                     return;
                 }
 
                 if (_options.MemoryCommitThreshold.HasValue || _options.MemoryCommitDrops.HasValue)
                 {
                     bool isTimerSet = false;
-                    DetachProcess();
-
-                    while (!IsPollingCompleted)
+                    if (!_options.NeedAttachDebugger)
                     {
-                        if (!isTimerSet)
-                            miniDumper.MemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops, ref isTimerSet);
-                    }
+                        DetachProcess();
 
-                    CheckNumberOfDumpsTaken(miniDumper);
-                    return;
+                        while (!IsPollingCompleted)
+                        {
+                            if (!isTimerSet)
+                                miniDumper.MemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops,_options.NumberOfDumps, ref isTimerSet);
+                        }
+
+                        return;
+                    }
+                    else
+                    {
+                        miniDumper.MemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops, _options.NumberOfDumps, ref isTimerSet);
+                    }
                 }
 
                 while (!_detached)
@@ -150,18 +155,7 @@ namespace MiniDumper
                 }
             }
         }
-
-        private void CheckNumberOfDumpsTaken(MiniDumper miniDumper)
-        {
-            if (miniDumper.NumberOfDumpsTaken == _options.NumberOfDumps)
-                return;
-
-            while (miniDumper.NumberOfDumpsTaken < _options.NumberOfDumps)
-            {
-                miniDumper.DumpWithoutReason();
-            }
-        }
-
+        
         private static DEBUG_EVENT? WaitForDebugEvent(uint timeout)
         {
             DEBUG_EVENT debugEvent;
@@ -307,6 +301,7 @@ namespace MiniDumper
             Console.WriteLine("Dump filename/mask:  PROCESSNAME_YYMMDD_HHMMSS");
             Console.WriteLine("Terminal monitor:    {0}", _options.DumpOnProcessTerminate ? "Enabled" : "Disabled");
             Console.WriteLine("Debug output:        {0}", _options.Verbose ? "Enabled" : "Disabled");
+            Console.WriteLine("Commit threshold:    {0}", _options.MemoryCommitThreshold.HasValue ? $">= {_options.MemoryCommitThreshold} MB" : "Disabled");
             Console.WriteLine();
             Console.WriteLine("Press Ctrl-C to end monitoring without terminating the process.");
             Console.WriteLine();
@@ -315,7 +310,7 @@ namespace MiniDumper
         private MiniDumper CreateMiniDumper()
         {
             return new MiniDumper(_dumpFolder, _pid, _processName, _logger,
-                OptionToDumpType(_options), _options.Async, _options.ExceptionFilter);
+                OptionToDumpType(_options), _options.Async, _options.ExceptionFilter, _options.NumberOfDumps);
         }
 
         static string GetProcessName(int processId)
