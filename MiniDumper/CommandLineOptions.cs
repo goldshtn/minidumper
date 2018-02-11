@@ -28,6 +28,12 @@ namespace MiniDumper
         [Option('l', HelpText = "Display the debug logging of the process + diagnostics info from the minidumper.")]
         public bool Verbose { get; set; }
 
+        [Option('y', HelpText = "Memory commit threshold in MB at which to create a dump.")]
+        public uint? MemoryCommitThreshold { get; set; }
+        
+        [Option('z', HelpText = "Memory commit threshold in MB at which to create a dump.")]
+        public uint? MemoryCommitDrops { get; set; }
+
         [Option('f', HelpText = "Filter on the content of exceptions and debug logging. Wildcards (*) are supported.")]
         public string ExceptionFilter { get; set; }
 
@@ -51,7 +57,12 @@ namespace MiniDumper
 
         public bool NoDumpOptionSelected
         {
-            get { return !DumpOnProcessTerminate && DumpOnException == 0; }
+            get { return !DumpOnProcessTerminate && DumpOnException == 0 && !(MemoryCommitThreshold.HasValue || MemoryCommitDrops.HasValue); }
+        }
+
+        public bool NeedAttachDebugger
+        {
+            get { return DumpOnProcessTerminate || DumpOnException == 1 || DumpOnException == 2; }
         }
     }
 }

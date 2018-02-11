@@ -1,15 +1,19 @@
 ﻿using DumpWriter;
 using Microsoft.Diagnostics.Runtime;
+using MiniDumper.Win32.Processes;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Timers;
 using VsChromium.Core.Win32.Debugging;
 using VsChromium.Core.Win32.Processes;
-using Process = VsChromium.Core.Win32.Processes.NativeMethods;
+using ProcessNativeMethod = VsChromium.Core.Win32.Processes.NativeMethods;
 
 namespace MiniDumper
 {
@@ -52,9 +56,16 @@ namespace MiniDumper
         private readonly Regex rgxFilter;
         private readonly DataTarget target;
         private int numberOfDumpsTaken;
+        private bool isProcessTerminated;
+        private System.Timers.Timer pollingTimer;
+        private SafeProcessHandle hProcess;
+        uint processCommit;
+        uint? CommitThreshold, CommitDrops;
+        int numberOfDumps;
+        private bool IsNumberOfDumpsTaken => numberOfDumpsTaken >= numberOfDumps;
 
         public MiniDumper(string dumpFolder, int pid, string processName,
-            TextWriter logger, DumpType dumpType, bool writeAsync, string filter)
+            TextWriter logger, DumpType dumpType, bool writeAsync, string filter, int numberOfDumps)
         {
             this.dumpFolder = dumpFolder;
             this.pid = pid;
@@ -65,11 +76,22 @@ namespace MiniDumper
             this.rgxFilter = new Regex((filter ?? "*").Replace("*", ".*").Replace('?', '.'),
                 RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
             this.target = DataTarget.AttachToProcess(pid, 1000, AttachFlag.Passive);
+
+            pollingTimer = new System.Timers.Timer();
+            this.numberOfDumps = numberOfDumps;
         }
 
         public void DumpWithoutReason()
         {
-            PrintTrace("Taking a dump.");
+            if ((CommitThreshold.HasValue || CommitDrops.HasValue) && processCommit != uint.MinValue)
+            {
+                PrintTrace($"Commit {processCommit / 1024 / 1024}");
+            }
+            else
+            {
+                PrintTrace("Taking a dump.");
+            }
+
             MakeActualDump(IntPtr.Zero);
         }
 
@@ -154,7 +176,7 @@ namespace MiniDumper
 
         public void PrintDebugString(OUTPUT_DEBUG_STRING_INFO outputDbgStrInfo)
         {
-            using (SafeProcessHandle hProcess = Process.OpenProcess(ProcessAccessFlags.VmRead, false, pid))
+            using (SafeProcessHandle hProcess = ProcessNativeMethod.OpenProcess(ProcessAccessFlags.VmRead, false, pid))
             {
                 if (hProcess.IsInvalid)
                     throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
@@ -162,7 +184,7 @@ namespace MiniDumper
                 var dbgString = new byte[outputDbgStrInfo.nDebugStringLength];
 
                 uint numberOfBytesRead;
-                var result = Process.ReadProcessMemory(hProcess, outputDbgStrInfo.lpDebugStringData, dbgString, outputDbgStrInfo.nDebugStringLength, out numberOfBytesRead);
+                var result = ProcessNativeMethod.ReadProcessMemory(hProcess, outputDbgStrInfo.lpDebugStringData, dbgString, outputDbgStrInfo.nDebugStringLength, out numberOfBytesRead);
 
                 if (result)
                 {
@@ -178,14 +200,85 @@ namespace MiniDumper
             }
         }
 
+        public void MemoryCommitThreshold(uint? commitThreshold, uint? commitDrops, int NumberOfDumps, ref bool isTimerSet)
+        {
+            isTimerSet = true;
+            CommitThreshold = commitThreshold * 1048576;
+            CommitDrops = commitDrops * 1048576;
+
+            hProcess = ProcessNativeMethod.OpenProcess(ProcessAccessFlags.QueryInformation, false, pid);
+            if (hProcess.IsInvalid)
+                throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
+
+            OnTimedEvent();
+
+            if (Debugger.IsPollingCompleted)
+                return;
+
+            pollingTimer.Interval = 1000;
+            pollingTimer.Elapsed += OnTimedEvent;
+            pollingTimer.AutoReset = true;
+            pollingTimer.Enabled = true;
+        }
+
+        private void OnTimedEvent(Object source, ElapsedEventArgs e)
+        {
+            OnTimedEvent();
+        }
+
+        private void OnTimedEvent()
+        {
+            processCommit = GetProcessCommit(hProcess);
+            if ((CommitThreshold.HasValue && processCommit >= CommitThreshold) || (CommitDrops.HasValue && processCommit >= CommitDrops))
+            {
+                Debug.Write(CommitThreshold.HasValue ? $"Commit:\t >= {CommitDrops / 1024 / 1024}MB" : $"Commit:\t <= {CommitDrops / 1024 / 1024}MB");
+                Console.WriteLine("Commit {0}", processCommit / 1024 / 1024);
+
+                if (IsNumberOfDumpsTaken)
+                {
+                    Debugger.IsPollingCompleted = true;
+                    pollingTimer?.Stop();
+                }
+                else
+                {
+                    MakeActualDump(IntPtr.Zero);
+                }
+            }
+        }
+
+        private UInt32 GetProcessCommit(SafeProcessHandle hProcess)
+        {
+            try
+            {
+                var process = Process.GetProcessById(pid);
+                PROCESS_MEMORY_COUNTERS_EX counters;
+                var result = ProcessNativeMethod.GetProcessMemoryInfo(hProcess, out counters, (uint)Marshal.SizeOf<PROCESS_MEMORY_COUNTERS_EX>());
+                Debug.Assert(result);
+                if (!result)
+                {
+                    pollingTimer.Stop();
+                    Console.WriteLine(String.Format(format: "Unable to query process memory info {0}, error {x:8}", arg0: pid, arg1: Marshal.GetLastWin32Error()));
+                }
+                return counters.PrivateUsage.ToUInt32();
+            }
+            catch (ArgumentException)
+            {
+                pollingTimer.Stop();
+                PrintTrace("The process has exited.");
+                Debugger.IsPollingCompleted = true;
+                isProcessTerminated = true;
+                return 0;
+            }
+        }
+
         private void MakeActualDump(IntPtr excinfo)
         {
             var dumper = new DumpWriter.DumpWriter(logger);
-
             var filename = GetDumpFileName();
-            PrintTrace(string.Format("Dumping process memory to file: {0}", filename));
 
             Interlocked.Increment(ref numberOfDumpsTaken);
+
+            PrintTrace($"Dump {numberOfDumpsTaken} Dumping process memory to file: {filename}");
             dumper.Dump(pid, dumpType, excinfo, filename, writeAsync, dumpComment);
         }
 
@@ -217,9 +310,15 @@ namespace MiniDumper
             get { return numberOfDumpsTaken; }
         }
 
+        public bool IsProcessTerminated { get => isProcessTerminated; }
+
+
+
         public void Dispose()
         {
             target.Dispose();
+            hProcess.Dispose();
+            pollingTimer.Dispose();
         }
     }
 }
