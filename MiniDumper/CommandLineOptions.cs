@@ -62,7 +62,7 @@ namespace MiniDumper
 
         public bool NeedAttachDebugger
         {
-            get { return DumpOnProcessTerminate || DumpOnException == 0; }
+            get { return DumpOnProcessTerminate || DumpOnException == 1 || DumpOnException == 2; }
         }
     }
 }

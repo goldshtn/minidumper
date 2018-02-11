@@ -229,7 +229,6 @@ namespace MiniDumper
         private void OnTimedEvent()
         {
             processCommit = GetProcessCommit(hProcess);
-
             if ((CommitThreshold.HasValue && processCommit >= CommitThreshold) || (CommitDrops.HasValue && processCommit >= CommitDrops))
             {
                 Debug.Write(CommitThreshold.HasValue ? $"Commit:\t >= {CommitDrops / 1024 / 1024}MB" : $"Commit:\t <= {CommitDrops / 1024 / 1024}MB");
