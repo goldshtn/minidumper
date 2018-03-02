@@ -84,14 +84,16 @@ namespace MiniDumper
                         while (!IsPollingCompleted)
                         {
                             if (!isTimerSet)
-                                miniDumper.MemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops,_options.NumberOfDumps, ref isTimerSet);
+                            {
+                                miniDumper.DumpOnMemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops,_options.NumberOfDumps, ref isTimerSet);
+                            }
                         }
 
                         return;
                     }
                     else
                     {
-                        miniDumper.MemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops, _options.NumberOfDumps, ref isTimerSet);
+                        miniDumper.DumpOnMemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops, _options.NumberOfDumps, ref isTimerSet);
                     }
                 }
 

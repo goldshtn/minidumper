@@ -85,7 +85,7 @@ namespace MiniDumper
         {
             if ((CommitThreshold.HasValue || CommitDrops.HasValue) && processCommit != uint.MinValue)
             {
-                PrintTrace($"Commit {processCommit / 1024 / 1024}");
+                PrintTrace($"Commit {processCommit / 1024 / 1024}MB");
             }
             else
             {
@@ -179,8 +179,9 @@ namespace MiniDumper
             using (SafeProcessHandle hProcess = ProcessNativeMethod.OpenProcess(ProcessAccessFlags.VmRead, false, pid))
             {
                 if (hProcess.IsInvalid)
-                    throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
-
+                {
+                    throw new ArgumentException(String.Format("Unable to open process {0}, error {1x:8}", pid, Marshal.GetLastWin32Error()));
+                }
                 var dbgString = new byte[outputDbgStrInfo.nDebugStringLength];
 
                 uint numberOfBytesRead;
@@ -200,7 +201,7 @@ namespace MiniDumper
             }
         }
 
-        public void MemoryCommitThreshold(uint? commitThreshold, uint? commitDrops, int NumberOfDumps, ref bool isTimerSet)
+        public void DumpOnMemoryCommitThreshold(uint? commitThreshold, uint? commitDrops, int NumberOfDumps, ref bool isTimerSet)
         {
             isTimerSet = true;
             CommitThreshold = commitThreshold * 1048576;
@@ -208,12 +209,16 @@ namespace MiniDumper
 
             hProcess = ProcessNativeMethod.OpenProcess(ProcessAccessFlags.QueryInformation, false, pid);
             if (hProcess.IsInvalid)
+            {
                 throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
+            }
 
             OnTimedEvent();
 
             if (Debugger.IsPollingCompleted)
+            {
                 return;
+            }
 
             pollingTimer.Interval = 1000;
             pollingTimer.Elapsed += OnTimedEvent;
@@ -232,7 +237,7 @@ namespace MiniDumper
             if ((CommitThreshold.HasValue && processCommit >= CommitThreshold) || (CommitDrops.HasValue && processCommit >= CommitDrops))
             {
                 Debug.Write(CommitThreshold.HasValue ? $"Commit:\t >= {CommitDrops / 1024 / 1024}MB" : $"Commit:\t <= {CommitDrops / 1024 / 1024}MB");
-                Console.WriteLine("Commit {0}", processCommit / 1024 / 1024);
+                Console.WriteLine("Commit {0}MB", processCommit / 1024 / 1024);
 
                 if (IsNumberOfDumpsTaken)
                 {
@@ -317,7 +322,7 @@ namespace MiniDumper
         public void Dispose()
         {
             target.Dispose();
-            hProcess.Dispose();
+            hProcess?.Dispose();
             pollingTimer.Dispose();
         }
     }
