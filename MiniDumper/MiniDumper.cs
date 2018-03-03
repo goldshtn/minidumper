@@ -180,7 +180,7 @@ namespace MiniDumper
             {
                 if (hProcess.IsInvalid)
                 {
-                    throw new ArgumentException(String.Format("Unable to open process {0}, error {1x:8}", pid, Marshal.GetLastWin32Error()));
+                    throw new ArgumentException(String.Format("Unable to open process {0}, error {1:x8}", pid, Marshal.GetLastWin32Error()));
                 }
                 var dbgString = new byte[outputDbgStrInfo.nDebugStringLength];
 
@@ -210,7 +210,7 @@ namespace MiniDumper
             hProcess = ProcessNativeMethod.OpenProcess(ProcessAccessFlags.QueryInformation, false, pid);
             if (hProcess.IsInvalid)
             {
-                throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", pid, Marshal.GetLastWin32Error()));
+                throw new ArgumentException(String.Format("Unable to open process {0}, error {1:x8}", pid, Marshal.GetLastWin32Error()));
             }
 
             OnTimedEvent();
@@ -262,7 +262,7 @@ namespace MiniDumper
                 if (!result)
                 {
                     pollingTimer.Stop();
-                    Console.WriteLine(String.Format(format: "Unable to query process memory info {0}, error {x:8}", arg0: pid, arg1: Marshal.GetLastWin32Error()));
+                    Console.WriteLine(String.Format(format: "Unable to query process memory info {0}, error {1:x8}", arg0: pid, arg1: Marshal.GetLastWin32Error()));
                 }
                 return counters.PrivateUsage.ToUInt32();
             }
