@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
+using System.Timers;
 using VsChromium.Core.Win32;
 using VsChromium.Core.Win32.Debugging;
 using VsChromium.Core.Win32.Processes;
@@ -33,10 +33,10 @@ namespace MiniDumper
         private readonly TextWriter _logger;
         private readonly string _dumpFolder;
         private bool _detached;
-        private bool _shouldDeatch;
+        private bool _shouldStop;
         private int _pid;
         private string _processName;
-        public static bool IsPollingCompleted = false;
+        private Timer _timer;
 
         public Debugger(CommandLineOptions options)
         {
@@ -44,6 +44,7 @@ namespace MiniDumper
             _options = options;
             _logger = options.Verbose ? Console.Out : TextWriter.Null;
             _dumpFolder = options.DumpFolderForNewlyStartedProcess ?? Directory.GetCurrentDirectory();
+            _timer = new Timer(1000);
         }
 
         void TakeDumps()
@@ -57,7 +58,8 @@ namespace MiniDumper
             {
                 Console.WriteLine("Ctrl + C received - detaching from a process");
                 ev.Cancel = true;
-                _shouldDeatch = true;
+                _shouldStop = true;
+                _timer.Stop();
             };
 
             WaitForDebugEvents();
@@ -76,35 +78,19 @@ namespace MiniDumper
 
                 if (_options.MemoryCommitThreshold.HasValue || _options.MemoryCommitDrops.HasValue)
                 {
-                    bool isTimerSet = false;
-                    if (!_options.NeedAttachDebugger)
-                    {
-                        DetachProcess();
-
-                        while (!IsPollingCompleted)
-                        {
-                            if (!isTimerSet)
-                            {
-                                miniDumper.DumpOnMemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops,_options.NumberOfDumps, ref isTimerSet);
-                            }
-                        }
-
-                        return;
-                    }
-                    else
-                    {
-                        miniDumper.DumpOnMemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops, _options.NumberOfDumps, ref isTimerSet);
-                    }
+                    _timer.Elapsed += (o, ev) => CheckMemoryCommitThreshold(miniDumper);
+                    _timer.Start();
                 }
 
                 while (!_detached)
                 {
                     var debugEvent = WaitForDebugEvent(1000);
-                    if (_shouldDeatch)
+                    if (_shouldStop)
                     {
                         DetachProcess();
                         return;
                     }
+
                     if (debugEvent.HasValue)
                     {
                         switch (debugEvent.Value.dwDebugEventCode)
@@ -114,7 +100,8 @@ namespace MiniDumper
                                 {
                                     miniDumper.DumpOnProcessExit(debugEvent.Value.ExitProcess.dwExitCode);
                                 }
-                                _shouldDeatch = true;
+                                _shouldStop = true;
+                                _timer.Stop();
                                 break;
                             case DEBUG_EVENT_CODE.EXCEPTION_DEBUG_EVENT:
                                 var exception = debugEvent.Value.Exception;
@@ -133,20 +120,26 @@ namespace MiniDumper
                             default:
                                 break;
                         }
-                        if (!_shouldDeatch && miniDumper.NumberOfDumpsTaken >= _options.NumberOfDumps)
-                        {
-                            Console.WriteLine("Number of dumps exceeded the specified limit - detaching.");
-                            _shouldDeatch = true;
-                        }
-                        if (_shouldDeatch)
-                        {
-                            DetachProcess();
-                            return;
-                        }
-                        if (_detached)
-                        {
-                            return;
-                        }
+                    }
+
+                    if (!_shouldStop && miniDumper.NumberOfDumpsTaken >= _options.NumberOfDumps)
+                    {
+                        Console.WriteLine("Number of dumps exceeded the specified limit - detaching.");
+                        _shouldStop = true;
+                        _timer.Stop();
+                    }
+                    if (_shouldStop)
+                    {
+                        DetachProcess();
+                        return;
+                    }
+                    if (_detached)
+                    {
+                        return;
+                    }
+
+                    if (debugEvent.HasValue)
+                    {
                         var continueStatus = HandleDebugEvent(debugEvent.Value);
                         if (!DebuggingNativeMethods.ContinueDebugEvent(debugEvent.Value.dwProcessId,
                             debugEvent.Value.dwThreadId, continueStatus))
@@ -155,9 +148,31 @@ namespace MiniDumper
                         }
                     }
                 }
+                Debug.Assert(!_timer.Enabled);
             }
         }
-        
+
+        private void CheckMemoryCommitThreshold(MiniDumper miniDumper)
+        {
+            try
+            {
+                miniDumper.DumpOnMemoryCommitThreshold(_options.MemoryCommitThreshold, _options.MemoryCommitDrops);
+
+                if (!_shouldStop && miniDumper.NumberOfDumpsTaken >= _options.NumberOfDumps)
+                {
+                    Console.WriteLine("Number of dumps exceeded the specified limit - detaching.");
+                    _shouldStop = true;
+                    _timer.Stop();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                _shouldStop = true;
+                _timer.Stop();
+            }
+        }
+
         private static DEBUG_EVENT? WaitForDebugEvent(uint timeout)
         {
             DEBUG_EVENT debugEvent;

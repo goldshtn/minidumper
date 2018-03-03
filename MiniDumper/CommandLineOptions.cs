@@ -31,7 +31,7 @@ namespace MiniDumper
         [Option("maxmem", HelpText = "Memory commit threshold in MB at which to create a dump.")]
         public uint? MemoryCommitThreshold { get; set; }
         
-        [Option("minmem", HelpText = "Memory commit threshold in MB at which to create a dump.")]
+        [Option("minmem", HelpText = "Trigger when memory commit drops below specified MB value.")]
         public uint? MemoryCommitDrops { get; set; }
 
         [Option('f', HelpText = "Filter on the content of exceptions and debug logging. Wildcards (*) are supported.")]

@@ -346,8 +346,9 @@ namespace DumpWriter
                 (uint)_pid
                 );
             if (hProcess == IntPtr.Zero)
-                throw new ArgumentException(String.Format("Unable to open process {0}, error {x:8}", _pid, Marshal.GetLastWin32Error()));
- 
+            {
+                throw new ArgumentException(String.Format("Unable to open process {0}, error {1:x8}", _pid, Marshal.GetLastWin32Error()));
+            }
 
             _dumpFileStream = new FileStream(fileName, FileMode.Create);
 
