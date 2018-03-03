@@ -40,6 +40,10 @@ The command line options resemble those from procdump (not all features are yet 
   -l              Display the debug logging of the process + diagnostics info
                   from the minidumper.
 
+  --maxmem        Memory commit threshold in MB at which to create a dump.
+
+  --minmem        Trigger when memory commit drops below specified MB value.
+
   -f              Filter on the content of exceptions and debug logging.
                   Wildcards (*) are supported.
 
