@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using VsChromium.Core.Win32;
 using VsChromium.Core.Win32.Debugging;
 using VsChromium.Core.Win32.Processes;
@@ -17,10 +18,13 @@ namespace MiniDumper
     {
         static void Main(string[] args)
         {
-            try {
+            try
+            {
                 var result = Parser.Default.ParseArguments<CommandLineOptions>(args);
                 result.WithParsed(options => new Debugger(options).TakeDumps());
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 Console.Error.WriteLine("ERROR: {0}", ex.Message);
             }
         }
@@ -32,6 +36,7 @@ namespace MiniDumper
         private bool _shouldDeatch;
         private int _pid;
         private string _processName;
+        public static bool IsPollingCompleted = false;
 
         public Debugger(CommandLineOptions options)
         {
@@ -48,33 +53,65 @@ namespace MiniDumper
             ShowBanner();
 
             // setup Ctrl+C listener
-            Console.CancelKeyPress += (o, ev) => {
+            Console.CancelKeyPress += (o, ev) =>
+            {
                 Console.WriteLine("Ctrl + C received - detaching from a process");
                 ev.Cancel = true;
-                _shouldDeatch = true; 
+                _shouldDeatch = true;
             };
+
             WaitForDebugEvents();
         }
 
         private void WaitForDebugEvents()
         {
-            using (var miniDumper = CreateMiniDumper()) {
-                if (_options.NoDumpOptionSelected) {
+            using (var miniDumper = CreateMiniDumper())
+            {
+                if (_options.NoDumpOptionSelected)
+                {
                     miniDumper.DumpWithoutReason();
                     DetachProcess();
                     return;
                 }
 
-                while (!_detached) {
+                if (_options.MemoryCommitThreshold.HasValue || _options.MemoryCommitDrops.HasValue)
+                {
+                    bool isTimerSet = false;
+                    if (!_options.NeedAttachDebugger)
+                    {
+                        DetachProcess();
+
+                        while (!IsPollingCompleted)
+                        {
+                            if (!isTimerSet)
+                            {
+                                miniDumper.DumpOnMemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops,_options.NumberOfDumps, ref isTimerSet);
+                            }
+                        }
+
+                        return;
+                    }
+                    else
+                    {
+                        miniDumper.DumpOnMemoryCommitThreshold(_options.MemoryCommitThreshold.Value, _options.MemoryCommitDrops, _options.NumberOfDumps, ref isTimerSet);
+                    }
+                }
+
+                while (!_detached)
+                {
                     var debugEvent = WaitForDebugEvent(1000);
-                    if (_shouldDeatch) {
+                    if (_shouldDeatch)
+                    {
                         DetachProcess();
                         return;
                     }
-                    if (debugEvent.HasValue) {
-                        switch (debugEvent.Value.dwDebugEventCode) {
+                    if (debugEvent.HasValue)
+                    {
+                        switch (debugEvent.Value.dwDebugEventCode)
+                        {
                             case DEBUG_EVENT_CODE.EXIT_PROCESS_DEBUG_EVENT:
-                                if (_options.DumpOnProcessTerminate) {
+                                if (_options.DumpOnProcessTerminate)
+                                {
                                     miniDumper.DumpOnProcessExit(debugEvent.Value.ExitProcess.dwExitCode);
                                 }
                                 _shouldDeatch = true;
@@ -82,7 +119,8 @@ namespace MiniDumper
                             case DEBUG_EVENT_CODE.EXCEPTION_DEBUG_EVENT:
                                 var exception = debugEvent.Value.Exception;
                                 if (_options.DumpOnException == 1 && exception.dwFirstChance == 1 ||
-                                    _options.DumpOnException == 2 && exception.dwFirstChance == 0) {
+                                    _options.DumpOnException == 2 && exception.dwFirstChance == 0)
+                                {
                                     miniDumper.DumpOnException((uint)debugEvent.Value.dwThreadId, exception.ExceptionRecord);
                                 }
                                 break;
@@ -95,32 +133,37 @@ namespace MiniDumper
                             default:
                                 break;
                         }
-                        if (!_shouldDeatch && miniDumper.NumberOfDumpsTaken >= _options.NumberOfDumps) {
+                        if (!_shouldDeatch && miniDumper.NumberOfDumpsTaken >= _options.NumberOfDumps)
+                        {
                             Console.WriteLine("Number of dumps exceeded the specified limit - detaching.");
                             _shouldDeatch = true;
                         }
-                        if (_shouldDeatch) {
+                        if (_shouldDeatch)
+                        {
                             DetachProcess();
                             return;
                         }
-                        if (_detached) {
+                        if (_detached)
+                        {
                             return;
                         }
                         var continueStatus = HandleDebugEvent(debugEvent.Value);
                         if (!DebuggingNativeMethods.ContinueDebugEvent(debugEvent.Value.dwProcessId,
-                            debugEvent.Value.dwThreadId, continueStatus)) {
+                            debugEvent.Value.dwThreadId, continueStatus))
+                        {
                             throw new LastWin32ErrorException("Error in ContinueDebugEvent");
                         }
                     }
                 }
             }
         }
-
+        
         private static DEBUG_EVENT? WaitForDebugEvent(uint timeout)
         {
             DEBUG_EVENT debugEvent;
             var success = DebuggingNativeMethods.WaitForDebugEvent(out debugEvent, timeout);
-            if (!success) {
+            if (!success)
+            {
                 int hr = Marshal.GetHRForLastWin32Error();
                 if (hr == HResults.HR_ERROR_SEM_TIMEOUT)
                     return null;
@@ -132,7 +175,8 @@ namespace MiniDumper
 
         private static CONTINUE_STATUS HandleDebugEvent(DEBUG_EVENT value)
         {
-            if (value.dwDebugEventCode == DEBUG_EVENT_CODE.EXCEPTION_DEBUG_EVENT) {
+            if (value.dwDebugEventCode == DEBUG_EVENT_CODE.EXCEPTION_DEBUG_EVENT)
+            {
                 return CONTINUE_STATUS.DBG_EXCEPTION_NOT_HANDLED;
             }
             return CONTINUE_STATUS.DBG_CONTINUE;
@@ -140,16 +184,19 @@ namespace MiniDumper
 
         static void ValidateOptions(CommandLineOptions options)
         {
-            if (string.IsNullOrEmpty(options.ProcessInfo)) {
+            if (string.IsNullOrEmpty(options.ProcessInfo))
+            {
                 throw new ArgumentException("Either a process id or process name is required");
             }
             // file name and dump folder
             if (options.DumpFolderForNewlyStartedProcess != null &&
-                !Directory.Exists(options.DumpFolderForNewlyStartedProcess)) {
+                !Directory.Exists(options.DumpFolderForNewlyStartedProcess))
+            {
                 throw new ArgumentException("The specified dump folder does not exist.");
             }
             if (options.NoDumpOptionSelected && !string.IsNullOrEmpty(
-                options.DumpFolderForNewlyStartedProcess)) {
+                options.DumpFolderForNewlyStartedProcess))
+            {
                 throw new ArgumentException("Option to create an immediate dump when starting a process is not supported.");
             }
         }
@@ -160,48 +207,62 @@ namespace MiniDumper
             _processName = null;
 
             int pid;
-            if (int.TryParse(_options.ProcessInfo, out pid)) {
+            if (int.TryParse(_options.ProcessInfo, out pid))
+            {
                 _pid = pid;
-            } else {
+            }
+            else
+            {
                 // not numeric - let's try to find it by name
                 var procs = Process.GetProcesses();
-                foreach (var proc in procs) {
-                    try {
-                        if (_options.ProcessInfo.Equals(proc.MainModule.ModuleName, StringComparison.OrdinalIgnoreCase)) {
+                foreach (var proc in procs)
+                {
+                    try
+                    {
+                        if (_options.ProcessInfo.Equals(proc.MainModule.ModuleName, StringComparison.OrdinalIgnoreCase))
+                        {
                             _pid = proc.Id;
                             break;
                         }
-                    } catch {
+                    }
+                    catch
+                    {
                         // just ignore it
                     }
                 }
             }
-            if (_pid > 0) {
+            if (_pid > 0)
+            {
                 // process found - let's attach to it
-                if (!DebuggingNativeMethods.DebugActiveProcess(_pid)) {
+                if (!DebuggingNativeMethods.DebugActiveProcess(_pid))
+                {
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 }
                 _processName = GetProcessName(_pid);
                 return;
             }
-            if (spawnNew) {
+            if (spawnNew)
+            {
                 // final try - let's try creating it (but only if -x option is set)
                 var commandLine = _options.ProcessInfo + " " + string.Join(" ", _options.Args ?? new string[0]);
 
                 var startupInfo = new STARTUPINFO();
                 var processInformation = new PROCESS_INFORMATION();
                 var processCreationFlags = ProcessCreationFlags.DEBUG_ONLY_THIS_PROCESS;
-                if (_options.StartProcessInNewConsoleWindow) {
+                if (_options.StartProcessInNewConsoleWindow)
+                {
                     processCreationFlags |= ProcessCreationFlags.CREATE_NEW_CONSOLE;
                 }
                 bool res = ProcessNativeMethods.CreateProcess(null, new StringBuilder(commandLine),
-                    null, null, false, processCreationFlags, IntPtr.Zero, null, 
+                    null, null, false, processCreationFlags, IntPtr.Zero, null,
                     startupInfo, processInformation);
-                if (!res) {
+                if (!res)
+                {
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 }
 
-                if (!DebuggingNativeMethods.DebugSetProcessKillOnExit(false)) {
+                if (!DebuggingNativeMethods.DebugSetProcessKillOnExit(false))
+                {
                     Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 }
                 _pid = processInformation.dwProcessId;
@@ -213,10 +274,12 @@ namespace MiniDumper
 
         void DetachProcess()
         {
-            if (_detached) {
+            if (_detached)
+            {
                 return;
             }
-            if (!DebuggingNativeMethods.DebugActiveProcessStop(_pid)) {
+            if (!DebuggingNativeMethods.DebugActiveProcessStop(_pid))
+            {
                 _logger.Write("Exception occured when detaching from the process: {0}",
                     Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()));
             }
@@ -240,6 +303,7 @@ namespace MiniDumper
             Console.WriteLine("Dump filename/mask:  PROCESSNAME_YYMMDD_HHMMSS");
             Console.WriteLine("Terminal monitor:    {0}", _options.DumpOnProcessTerminate ? "Enabled" : "Disabled");
             Console.WriteLine("Debug output:        {0}", _options.Verbose ? "Enabled" : "Disabled");
+            Console.WriteLine("Commit threshold:    {0}", _options.MemoryCommitThreshold.HasValue ? $">= {_options.MemoryCommitThreshold} MB" : "Disabled");
             Console.WriteLine();
             Console.WriteLine("Press Ctrl-C to end monitoring without terminating the process.");
             Console.WriteLine();
@@ -248,7 +312,7 @@ namespace MiniDumper
         private MiniDumper CreateMiniDumper()
         {
             return new MiniDumper(_dumpFolder, _pid, _processName, _logger,
-                OptionToDumpType(_options), _options.Async, _options.ExceptionFilter);
+                OptionToDumpType(_options), _options.Async, _options.ExceptionFilter, _options.NumberOfDumps);
         }
 
         static string GetProcessName(int processId)
