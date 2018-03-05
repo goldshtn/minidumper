@@ -190,11 +190,11 @@ namespace MiniDumper
 
         public void DumpOnMemoryCommitThreshold(uint? commitThreshold, uint? commitDrops)
         {
-            processCommit = GetProcessCommit();
+            processCommit = GetProcessCommit() / _1MB;
             if ((commitThreshold.HasValue && processCommit >= commitThreshold.Value) ||
                 (commitDrops.HasValue && processCommit <= commitDrops.Value))
             {
-                Console.WriteLine("Commit {0}MB", processCommit / _1MB);
+                Console.WriteLine("Commit {0}MB", processCommit);
 
                 MakeActualDump(IntPtr.Zero);
             }
