@@ -71,16 +71,6 @@ namespace DumpWriter
             }
         }
 
-        public bool CanReadAsync
-        {
-            get
-            {
-#pragma warning disable CS0612 // Type or member is obsolete
-                return _impl.CanReadAsync;
-#pragma warning restore CS0612 // Type or member is obsolete
-            }
-        }
-
         public void Close()
         {
             _impl.Close();
@@ -144,13 +134,6 @@ namespace DumpWriter
         public bool VirtualQuery(ulong addr, out VirtualQueryData vq)
         {
             return _impl.VirtualQuery(addr, out vq);
-        }
-
-#pragma warning disable CS0612 // Type or member is obsolete
-        public AsyncMemoryReadResult ReadMemoryAsync(ulong address, int bytesRequested)
-#pragma warning restore CS0612 // Type or member is obsolete
-        {
-            throw new NotImplementedException();
         }
 
         #endregion

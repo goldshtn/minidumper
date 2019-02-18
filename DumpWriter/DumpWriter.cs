@@ -52,7 +52,7 @@ namespace DumpWriter
                 return;
 
             var readerType = typeof(DataTarget).Assembly.GetType("Microsoft.Diagnostics.Runtime.LiveDataReader");
-            var reader = (IDataReader)Activator.CreateInstance(readerType, _pid);
+            var reader = (IDataReader)Activator.CreateInstance(readerType, _pid, false);
             var readerLogger = new DumpReaderLogger(reader);
             var target = DataTarget.CreateFromDataReader(readerLogger);
 
@@ -91,7 +91,7 @@ namespace DumpWriter
             runtime.Modules.Count();
 
             // Touch all heap regions, roots, types
-            var heap = runtime.GetHeap();
+            var heap = runtime.Heap;
             heap.EnumerateRoots(enumerateStatics: false).Count();
             heap.EnumerateTypes().Count();
 

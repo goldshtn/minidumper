@@ -263,7 +263,8 @@ namespace MiniDumper
 
                 var startupInfo = new STARTUPINFO();
                 var processInformation = new PROCESS_INFORMATION();
-                var processCreationFlags = ProcessCreationFlags.DEBUG_ONLY_THIS_PROCESS;
+                var processCreationFlags = ProcessCreationFlags.DEBUG_ONLY_THIS_PROCESS |
+                                           ProcessCreationFlags.CREATE_UNICODE_ENVIRONMENT;
                 if (_options.StartProcessInNewConsoleWindow)
                 {
                     processCreationFlags |= ProcessCreationFlags.CREATE_NEW_CONSOLE;
@@ -304,7 +305,7 @@ namespace MiniDumper
         void ShowBanner()
         {
             Console.WriteLine("MiniDumper - writes .NET process dump files");
-            Console.WriteLine("Copyright (C) 2018 Sasha Goldstein (@goldshtn)");
+            Console.WriteLine("Copyright (C) 2019 Sasha Goldstein (@goldshtn)");
             Console.WriteLine();
             Console.WriteLine("With contributions from Sebastian Solnica (@lowleveldesign)");
             Console.WriteLine();

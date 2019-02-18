@@ -6,10 +6,10 @@ namespace MiniDumper
     class CommandLineOptions
     {
         [Option('m', HelpText =
-            "Create a dump file, second paramer: \r\n" +
-            "    -mm minidump enough to diagnose crashes and display call stacks.\r\n" +
-            "    -mh dump file with the CLR heap, but without module code or unmanaged memory contents\r\n" +
-            "    -ma complete dump file with the full memory address space", Required = true)]
+            "Create a dump file: " +
+            "-mm (dump file with crash info and call stacks); " +
+            "-mh (dump file with the CLR heap, no native memory); " +
+            "-ma (complete dump file with the full memory address space)", Required = true)]
         public char DumpType { get; set; }
 
         [Option("async", HelpText =
