@@ -9,8 +9,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
-using System.Timers;
 using VsChromium.Core.Win32.Debugging;
 using VsChromium.Core.Win32.Processes;
 using ProcessNativeMethod = VsChromium.Core.Win32.Processes.NativeMethods;
@@ -56,7 +54,6 @@ namespace MiniDumper
         private readonly DumpType dumpType;
         private readonly bool writeAsync;
         private readonly Regex rgxFilter;
-        private readonly DataTarget target;
         private int numberOfDumpsTaken;
         private SafeProcessHandle hProcess;
         uint processCommit;
@@ -73,7 +70,6 @@ namespace MiniDumper
             this.writeAsync = writeAsync;
             rgxFilter = new Regex((filter ?? "*").Replace("*", ".*").Replace('?', '.'),
                 RegexOptions.Singleline | RegexOptions.Compiled | RegexOptions.IgnoreCase);
-            target = DataTarget.AttachToProcess(pid, 1000, AttachFlag.Passive);
             hProcess = ProcessNativeMethod.OpenProcess(ProcessAccessFlags.QueryInformation | ProcessAccessFlags.VmRead, false, pid);
             if (hProcess.IsInvalid)
             {
@@ -91,46 +87,56 @@ namespace MiniDumper
 
         public void DumpOnException(uint threadId, EXCEPTION_RECORD ev)
         {
-            if (ev.ExceptionCode == BREAKPOINT_CODE)
+            byte[] threadContext = new byte[Native.CONTEXT_SIZE];
+            bool shouldMakeDump = false;
+
+            using (var target = DataTarget.AttachToProcess(pid, 1000, AttachFlag.Passive))
             {
-                return;
-            }
-            if (ev.ExceptionCode == CLRDBG_NOTIFICATION_EXCEPTION_CODE)
-            {
-                // based on https://social.msdn.microsoft.com/Forums/vstudio/en-US/bca092d4-d2b5-49ef-8bbc-cbce2c67aa89/net-40-firstchance-exception-0x04242420?forum=clr
-                // it's a "notification exception" and can be safely ignored
-                return;
-            }
-            if (ev.ExceptionCode == CTRL_C_EXCEPTION_CODE)
-            {
-                // we will also ignore CTRL+C events
-                return;
-            }
-            // print information about the exception (decode it)
-            ClrException managedException = null;
-            foreach (var clrver in target.ClrVersions)
-            {
-                var runtime = clrver.CreateRuntime();
-                var thr = runtime.Threads.FirstOrDefault(t => t.OSThreadId == threadId);
-                if (thr != null)
+                if (ev.ExceptionCode == BREAKPOINT_CODE)
                 {
-                    managedException = thr.CurrentException;
-                    break;
+                    return;
+                }
+                if (ev.ExceptionCode == CLRDBG_NOTIFICATION_EXCEPTION_CODE)
+                {
+                    // based on https://social.msdn.microsoft.com/Forums/vstudio/en-US/bca092d4-d2b5-49ef-8bbc-cbce2c67aa89/net-40-firstchance-exception-0x04242420?forum=clr
+                    // it's a "notification exception" and can be safely ignored
+                    return;
+                }
+                if (ev.ExceptionCode == CTRL_C_EXCEPTION_CODE)
+                {
+                    // we will also ignore CTRL+C events
+                    return;
+                }
+                // print information about the exception (decode it)
+                ClrException managedException = null;
+                foreach (var clrver in target.ClrVersions)
+                {
+                    var runtime = clrver.CreateRuntime();
+                    var thr = runtime.Threads.FirstOrDefault(t => t.OSThreadId == threadId);
+                    if (thr != null)
+                    {
+                        managedException = thr.CurrentException;
+                        break;
+                    }
+                }
+                var exceptionInfo = string.Format("{0:X}.{1} (\"{2}\")", ev.ExceptionCode,
+                    managedException != null ? managedException.Type.Name : "Native",
+                    managedException != null ? managedException.Message : "N/A");
+
+                PrintTrace("Exception: " + exceptionInfo);
+
+                shouldMakeDump = rgxFilter.IsMatch(exceptionInfo);
+
+                if (shouldMakeDump)
+                {
+                    target.DataReader.GetThreadContext(threadId, 0, Native.CONTEXT_SIZE, threadContext);
                 }
             }
-            var exceptionInfo = string.Format("{0:X}.{1} (\"{2}\")", ev.ExceptionCode,
-                managedException != null ? managedException.Type.Name : "Native",
-                managedException != null ? managedException.Message : "N/A");
 
-            PrintTrace("Exception: " + exceptionInfo);
-
-            if (rgxFilter.IsMatch(exceptionInfo))
+            if (shouldMakeDump)
             {
-                byte[] threadContext = new byte[Native.CONTEXT_SIZE];
-                target.DataReader.GetThreadContext(threadId, 0, Native.CONTEXT_SIZE, threadContext);
                 IntPtr pev = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(EXCEPTION_RECORD)));
-                Marshal.StructureToPtr(new EXCEPTION_RECORD
-                {
+                Marshal.StructureToPtr(new EXCEPTION_RECORD {
                     ExceptionAddress = ev.ExceptionAddress,
                     ExceptionFlags = ev.ExceptionFlags,
                     ExceptionCode = ev.ExceptionCode,
@@ -138,15 +144,13 @@ namespace MiniDumper
                     NumberParameters = ev.NumberParameters,
                     ExceptionInformation = ev.ExceptionInformation
                 }, pev, false);
-                var excpointers = new EXCEPTION_POINTERS
-                {
+                var excpointers = new EXCEPTION_POINTERS {
                     ExceptionRecord = pev,
                     ContextRecord = threadContext
                 };
                 IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(excpointers));
                 Marshal.StructureToPtr(excpointers, ptr, false);
-                var excinfo = new MINIDUMP_EXCEPTION_INFORMATION()
-                {
+                var excinfo = new MINIDUMP_EXCEPTION_INFORMATION() {
                     ThreadId = threadId,
                     ClientPointers = false,
                     ExceptionPointers = ptr
@@ -260,7 +264,6 @@ namespace MiniDumper
 
         public void Dispose()
         {
-            target.Dispose();
             hProcess.Dispose();
         }
     }

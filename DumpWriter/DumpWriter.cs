@@ -54,24 +54,26 @@ namespace DumpWriter
             var readerType = typeof(DataTarget).Assembly.GetType("Microsoft.Diagnostics.Runtime.LiveDataReader");
             var reader = (IDataReader)Activator.CreateInstance(readerType, _pid, false);
             var readerLogger = new DumpReaderLogger(reader);
-            var target = DataTarget.CreateFromDataReader(readerLogger);
 
-            foreach (var clrVersion in target.ClrVersions)
+            using (var target = DataTarget.CreateFromDataReader(readerLogger))
             {
-                var runtime = clrVersion.CreateRuntime();
+                foreach (var clrVersion in target.ClrVersions)
+                {
+                    var runtime = clrVersion.CreateRuntime();
 
-                AddCLRRegions(runtime);
+                    AddCLRRegions(runtime);
 
-                TouchOtherRegions(readerLogger, runtime);
+                    TouchOtherRegions(readerLogger, runtime);
 
-                _logger.WriteLine("{0} ranges requested by the DAC, total size {1:N0}",
-                    _otherClrRegions.Count,
-                    _otherClrRegions.Sum(r => (long)(r.Key - r.Value))
-                    );
-                _logger.WriteLine("{0} CLR regions, total size {1:N0}",
-                    _majorClrRegions.Count,
-                    _majorClrRegions.Sum(r => (long)(r.Key - r.Value))
-                    );
+                    _logger.WriteLine("{0} ranges requested by the DAC, total size {1:N0}",
+                        _otherClrRegions.Count,
+                        _otherClrRegions.Sum(r => (long)(r.Key - r.Value))
+                        );
+                    _logger.WriteLine("{0} CLR regions, total size {1:N0}",
+                        _majorClrRegions.Count,
+                        _majorClrRegions.Sum(r => (long)(r.Key - r.Value))
+                        );
+                }
             }
         }
 
@@ -179,8 +181,7 @@ namespace DumpWriter
                 case MINIDUMP_CALLBACK_TYPE.IoWriteAllCallback:
                     _logger.WriteLine("\tIOWriteAll: offset = {0:x8} buffer = {1:x16} size = {2:x8}",
                         CallbackInput.Io.Offset, CallbackInput.Io.Buffer, CallbackInput.Io.BufferBytes);
-                    var segment = new DumpedSegment
-                    {
+                    var segment = new DumpedSegment {
                         Offset = CallbackInput.Io.Offset,
                         Data = new byte[CallbackInput.Io.BufferBytes]
                     };
